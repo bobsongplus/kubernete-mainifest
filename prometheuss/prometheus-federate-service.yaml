@@ -1,0 +1,16 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: prometheus-federate
+  namespace: kube-system
+  labels:
+    plugin: prometheus-federate
+spec:
+  type: NodePort
+  ports:
+  - name: prometheus-federate
+    protocol: TCP
+    port: 9090
+    nodePort: 30901
+  selector:
+    plugin: prometheus-federate

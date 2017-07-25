@@ -1,0 +1,74 @@
+{
+    "kind": "DaemonSet",
+    "apiVersion": "extensions/v1beta1",
+    "metadata": {
+        "name": "assist",
+        "namespace": "kube-system",
+        "labels": {
+            "app": "assist"
+        }
+    },
+    "spec": {
+        "selector": {
+            "matchLabels": {
+                "app": "assist"
+            }
+        },
+        "template": {
+            "metadata": {
+                "labels": {
+                    "app": "assist"
+                }
+            },
+            "spec": {
+                "volumes": [
+                    {
+                        "name": "varlog",
+                        "hostPath": {
+                            "path": "/var/log"
+                        }
+                    },
+                    {
+                        "name": "varlibkubelet",
+                        "hostPath": {
+                            "path": "/var/lib/kubelet"
+                        }
+                    }
+                ],
+                "containers": [
+                    {
+                        "name": "assist-agent",
+                        "image": "192.168.1.12/tenx_containers/assist:v1.0.8",
+                        "command": [
+                            "/assist"
+                        ],
+                        "args": [
+                            "--logtostderr",
+                            "--v=6"
+                        ],
+                        "resources": {},
+                        "volumeMounts": [
+                            {
+                                "name": "varlog",
+                                "mountPath": "/var/log"
+                            },
+                            {
+                                "name": "varlibkubelet",
+                                "mountPath": "/var/lib/kubelet"
+                            }
+                        ],
+                        "terminationMessagePath": "/dev/termination-log",
+                        "imagePullPolicy": "IfNotPresent",
+                        "securityContext": {
+                            "privileged": true
+                        }
+                    }
+                ],
+                "restartPolicy": "Always",
+                "terminationGracePeriodSeconds": 30,
+                "dnsPolicy": "ClusterFirst",
+                "securityContext": {}
+            }
+        }
+    }
+}

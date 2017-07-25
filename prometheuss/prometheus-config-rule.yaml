@@ -1,0 +1,12 @@
+apiVersion: v1
+data:
+  admin.rule: "ALERT container_cpu_usage_seconds_total_gt_8000_a7a217fe9944229238d85e556c78738b\n\tIF
+    (ceil(sum(rate(container_cpu_usage_seconds_total{namespace=\"admin\",pod_name=~\"^test11-[0-9]{5,15}-[0-9a-zA-Z]{5}$\"}[5m]))
+    * 100 * 100) / 100) > 80\n\tLABELS {tenxClusterID=\"CID-fe23111d77cb\", tenxNamespace=\"admin\",
+    tenxStrategyID=\"STRAID-2UHEKGDWxmFv\", tenxStrategyName=\"fixissue1\", tenxTargetName=\"test11\",
+    tenxTargetType=\"service\"}\n\tANNOTATIONS {condition=\"CPU利用率 > 80%\", createTime=\"2017-06-01T03:02:16Z\",
+    currentValue=\"CPU利用率 {{ $value }}%\", tenxMetricType=\"cpu/usage_rate\", tokenMD5=\"326aa6cdbb359a3dbca0e05d2d21d532\"}\n"
+kind: ConfigMap
+metadata:
+  name: prometheus-rules
+  namespace: kube-system

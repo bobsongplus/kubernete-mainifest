@@ -1,0 +1,72 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    name: prometheus-deployment
+    plugin: prometheus-federate
+    app: prometheus-federate
+  name: prometheus-federate
+  namespace: kube-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      plugin: prometheus-federate
+  template:
+    metadata:
+      labels:
+        plugin: prometheus-federate
+    spec:
+      containers:
+      - image: 192.168.1.52/tenx_containers/prometheus:v1.6.1
+        resources:
+          requests:
+            cpu: 200m
+            memory: 300Mi
+          limits:
+            cpu: 200m
+            memory: 300Mi
+        name: prometheus-federate
+        command:
+        - "/bin/prometheus"
+        args:
+        - "-config.file=/etc/prometheus/prometheus.yaml"
+        - "-storage.local.path=/prometheus"
+        - "-storage.local.retention=24h"
+        - "-alertmanager.url=http://alertmanager:9093"
+        ports:
+        - containerPort: 9090
+          protocol: TCP
+        volumeMounts:
+        - mountPath: "/etc/prometheus"
+          name: config-volume
+        - name: tenxcloud-time-localtime
+          readOnly: true
+          mountPath: "/etc/localtime"
+        - name: tenxcloud-time-zone
+          readOnly: true
+          mountPath: "/etc/timezone"
+      - image: 192.168.1.52/tenx_containers/inotify:1.0
+        resources:
+          requests:
+            cpu: 200m
+            memory: 200Mi
+          limits:
+            cpu: 200m
+            memory: 200Mi
+        name: notify
+        args:
+        - 'while inotifywait -qq -e modify,create,delete /etc/prometheus/;
+          do sh -c  "curl -X POST http://localhost:9090/-/reload"; done; '
+      volumes:
+      - emptyDir: {}
+        name: data
+      - configMap:
+          name: prometheus-config-federate
+        name: config-volume
+      - name: tenxcloud-time-localtime
+        hostPath:
+          path: "/etc/localtime"
+      - name: tenxcloud-time-zone
+        hostPath:
+          path: "/etc/timezone"
