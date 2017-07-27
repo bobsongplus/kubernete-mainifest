@@ -1,0 +1,708 @@
+{
+    "kind": "List",
+    "apiVersion": "v1",
+    "metadata": {},
+    "items": [
+        {
+            "kind": "DaemonSet",
+            "apiVersion": "extensions/v1beta1",
+            "metadata": {
+                "name": "es-master",
+                "namespace": "kube-system",
+                "selfLink": "/apis/extensions/v1beta1/namespaces/kube-system/daemonsets/es-master",
+                "uid": "8421aba8-4c1c-11e7-be16-005056852bc9",
+                "resourceVersion": "512524",
+                "generation": 1,
+                "creationTimestamp": "2017-06-08T07:31:41Z",
+                "labels": {
+                    "component": "elasticsearch",
+                    "role": "master"
+                }
+            },
+            "spec": {
+                "selector": {
+                    "matchLabels": {
+                        "component": "elasticsearch",
+                        "role": "master"
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "creationTimestamp": null,
+                        "labels": {
+                            "component": "elasticsearch",
+                            "role": "master"
+                        }
+                    },
+                    "spec": {
+                        "volumes": [
+                            {
+                                "name": "storage",
+                                "emptyDir": {}
+                            }
+                        ],
+                        "containers": [
+                            {
+                                "name": "es-master",
+                                "image": "192.168.1.12/tenxuser/elasticsearch-cluster:2.4.1",
+                                "ports": [
+                                    {
+                                        "name": "transport",
+                                        "containerPort": 9300,
+                                        "protocol": "TCP"
+                                    }
+                                ],
+                                "env": [
+                                    {
+                                        "name": "NAMESPACE",
+                                        "valueFrom": {
+                                            "fieldRef": {
+                                                "apiVersion": "v1",
+                                                "fieldPath": "metadata.namespace"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "NODE_NAME",
+                                        "valueFrom": {
+                                            "fieldRef": {
+                                                "apiVersion": "v1",
+                                                "fieldPath": "metadata.name"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "CLUSTER_NAME",
+                                        "value": "es-cluster"
+                                    },
+                                    {
+                                        "name": "NUMBER_OF_MASTERS",
+                                        "value": "2"
+                                    },
+                                    {
+                                        "name": "NODE_MASTER",
+                                        "value": "true"
+                                    },
+                                    {
+                                        "name": "NODE_INGEST",
+                                        "value": "false"
+                                    },
+                                    {
+                                        "name": "NODE_DATA",
+                                        "value": "false"
+                                    },
+                                    {
+                                        "name": "HTTP_ENABLE",
+                                        "value": "false"
+                                    },
+                                    {
+                                        "name": "ES_JAVA_OPTS",
+                                        "value": "-Xms256m -Xmx256m"
+                                    }
+                                ],
+                                "resources": {},
+                                "volumeMounts": [
+                                    {
+                                        "name": "storage",
+                                        "mountPath": "/data"
+                                    }
+                                ],
+                                "terminationMessagePath": "/dev/termination-log",
+                                "imagePullPolicy": "Always",
+                                "securityContext": {
+                                    "capabilities": {
+                                        "add": [
+                                            "IPC_LOCK",
+                                            "SYS_RESOURCE"
+                                        ]
+                                    },
+                                    "privileged": false
+                                }
+                            }
+                        ],
+                        "restartPolicy": "Always",
+                        "terminationGracePeriodSeconds": 30,
+                        "dnsPolicy": "ClusterFirst",
+                        "nodeSelector": {
+                            "kube-system/es-node": "true"
+                        },
+                        "securityContext": {}
+                    }
+                }
+            },
+            "status": {
+                "currentNumberScheduled": 0,
+                "numberMisscheduled": 0,
+                "desiredNumberScheduled": 0
+            }
+        },
+        {
+            "kind": "DaemonSet",
+            "apiVersion": "extensions/v1beta1",
+            "metadata": {
+                "name": "kube-discovery",
+                "namespace": "kube-system",
+                "selfLink": "/apis/extensions/v1beta1/namespaces/kube-system/daemonsets/kube-discovery",
+                "uid": "08698fcb-49c5-11e7-be16-005056852bc9",
+                "resourceVersion": "140",
+                "generation": 1,
+                "creationTimestamp": "2017-06-05T08:00:25Z",
+                "labels": {
+                    "component": "kube-discovery",
+                    "k8s-app": "kube-discovery",
+                    "kubernetes.io/cluster-service": "true",
+                    "name": "kube-discovery",
+                    "tier": "node"
+                }
+            },
+            "spec": {
+                "selector": {
+                    "matchLabels": {
+                        "component": "kube-discovery",
+                        "k8s-app": "kube-discovery",
+                        "kubernetes.io/cluster-service": "true",
+                        "name": "kube-discovery",
+                        "tier": "node"
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "creationTimestamp": null,
+                        "labels": {
+                            "component": "kube-discovery",
+                            "k8s-app": "kube-discovery",
+                            "kubernetes.io/cluster-service": "true",
+                            "name": "kube-discovery",
+                            "tier": "node"
+                        },
+                        "annotations": {
+                            "scheduler.alpha.kubernetes.io/affinity": "{\"nodeAffinity\":{\"requiredDuringSchedulingIgnoredDuringExecution\":{\"nodeSelectorTerms\":[{\"matchExpressions\":[{\"key\":\"kubeadm.alpha.kubernetes.io/role\",\"operator\":\"In\",\"values\":[\"master\"]}]}]}}}",
+                            "scheduler.alpha.kubernetes.io/tolerations": "[{\"key\":\"dedicated\",\"value\":\"master\",\"effect\":\"NoSchedule\"}]"
+                        }
+                    },
+                    "spec": {
+                        "volumes": [
+                            {
+                                "name": "clusterinfo",
+                                "secret": {
+                                    "secretName": "clusterinfo",
+                                    "defaultMode": 420
+                                }
+                            }
+                        ],
+                        "containers": [
+                            {
+                                "name": "kube-discovery",
+                                "image": "192.168.1.12/tenx_containers/kube-discovery-amd64:1.0.tenx.1",
+                                "command": [
+                                    "/usr/local/bin/kube-discovery"
+                                ],
+                                "ports": [
+                                    {
+                                        "name": "http",
+                                        "hostPort": 9898,
+                                        "containerPort": 9898,
+                                        "protocol": "TCP"
+                                    }
+                                ],
+                                "resources": {},
+                                "volumeMounts": [
+                                    {
+                                        "name": "clusterinfo",
+                                        "readOnly": true,
+                                        "mountPath": "/tmp/secret"
+                                    }
+                                ],
+                                "terminationMessagePath": "/dev/termination-log",
+                                "imagePullPolicy": "IfNotPresent",
+                                "securityContext": {
+                                    "seLinuxOptions": {
+                                        "type": "unconfined_t"
+                                    }
+                                }
+                            }
+                        ],
+                        "restartPolicy": "Always",
+                        "terminationGracePeriodSeconds": 30,
+                        "dnsPolicy": "ClusterFirst",
+                        "hostNetwork": true,
+                        "securityContext": {}
+                    }
+                }
+            },
+            "status": {
+                "currentNumberScheduled": 1,
+                "numberMisscheduled": 0,
+                "desiredNumberScheduled": 1
+            }
+        },
+        {
+            "kind": "DaemonSet",
+            "apiVersion": "extensions/v1beta1",
+            "metadata": {
+                "name": "kube-proxy-amd64",
+                "namespace": "kube-system",
+                "selfLink": "/apis/extensions/v1beta1/namespaces/kube-system/daemonsets/kube-proxy-amd64",
+                "uid": "08b9df43-49c5-11e7-be16-005056852bc9",
+                "resourceVersion": "660",
+                "generation": 1,
+                "creationTimestamp": "2017-06-05T08:00:26Z",
+                "labels": {
+                    "component": "kube-proxy-amd64",
+                    "k8s-app": "kube-proxy-amd64",
+                    "kubernetes.io/cluster-service": "true",
+                    "name": "kube-proxy-amd64",
+                    "tier": "node"
+                }
+            },
+            "spec": {
+                "selector": {
+                    "matchLabels": {
+                        "component": "kube-proxy-amd64",
+                        "k8s-app": "kube-proxy-amd64",
+                        "kubernetes.io/cluster-service": "true",
+                        "name": "kube-proxy-amd64",
+                        "tier": "node"
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "creationTimestamp": null,
+                        "labels": {
+                            "component": "kube-proxy-amd64",
+                            "k8s-app": "kube-proxy-amd64",
+                            "kubernetes.io/cluster-service": "true",
+                            "name": "kube-proxy-amd64",
+                            "tier": "node"
+                        },
+                        "annotations": {
+                            "scheduler.alpha.kubernetes.io/tolerations": "[{\"key\":\"dedicated\",\"value\":\"master\",\"effect\":\"NoSchedule\"}]"
+                        }
+                    },
+                    "spec": {
+                        "volumes": [
+                            {
+                                "name": "kubeconfig",
+                                "hostPath": {
+                                    "path": "/etc/kubernetes/kubelet.conf"
+                                }
+                            },
+                            {
+                                "name": "dbus",
+                                "hostPath": {
+                                    "path": "/var/run/dbus"
+                                }
+                            }
+                        ],
+                        "containers": [
+                            {
+                                "name": "kube-proxy",
+                                "image": "192.168.1.12/tenx_containers/kube-proxy-amd64:v1.4.1",
+                                "command": [
+                                    "/usr/local/bin/kube-proxy",
+                                    "--v=1",
+                                    "--kubeconfig=/run/kubeconfig",
+                                    "--proxy-mode=iptables"
+                                ],
+                                "resources": {},
+                                "volumeMounts": [
+                                    {
+                                        "name": "dbus",
+                                        "mountPath": "/var/run/dbus"
+                                    },
+                                    {
+                                        "name": "kubeconfig",
+                                        "mountPath": "/run/kubeconfig"
+                                    }
+                                ],
+                                "terminationMessagePath": "/dev/termination-log",
+                                "imagePullPolicy": "IfNotPresent",
+                                "securityContext": {
+                                    "privileged": true
+                                }
+                            }
+                        ],
+                        "restartPolicy": "Always",
+                        "terminationGracePeriodSeconds": 30,
+                        "dnsPolicy": "ClusterFirst",
+                        "nodeSelector": {
+                            "beta.kubernetes.io/arch": "amd64"
+                        },
+                        "hostNetwork": true,
+                        "securityContext": {}
+                    }
+                }
+            },
+            "status": {
+                "currentNumberScheduled": 3,
+                "numberMisscheduled": 0,
+                "desiredNumberScheduled": 3
+            }
+        },
+        {
+            "kind": "DaemonSet",
+            "apiVersion": "extensions/v1beta1",
+            "metadata": {
+                "name": "kube-proxy-arm",
+                "namespace": "kube-system",
+                "selfLink": "/apis/extensions/v1beta1/namespaces/kube-system/daemonsets/kube-proxy-arm",
+                "uid": "08bc0ee7-49c5-11e7-be16-005056852bc9",
+                "resourceVersion": "153",
+                "generation": 1,
+                "creationTimestamp": "2017-06-05T08:00:26Z",
+                "labels": {
+                    "component": "kube-proxy-arm",
+                    "k8s-app": "kube-proxy-arm",
+                    "kubernetes.io/cluster-service": "true",
+                    "name": "kube-proxy-arm",
+                    "tier": "node"
+                }
+            },
+            "spec": {
+                "selector": {
+                    "matchLabels": {
+                        "component": "kube-proxy-arm",
+                        "k8s-app": "kube-proxy-arm",
+                        "kubernetes.io/cluster-service": "true",
+                        "name": "kube-proxy-arm",
+                        "tier": "node"
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "creationTimestamp": null,
+                        "labels": {
+                            "component": "kube-proxy-arm",
+                            "k8s-app": "kube-proxy-arm",
+                            "kubernetes.io/cluster-service": "true",
+                            "name": "kube-proxy-arm",
+                            "tier": "node"
+                        },
+                        "annotations": {
+                            "scheduler.alpha.kubernetes.io/tolerations": "[{\"key\":\"dedicated\",\"value\":\"master\",\"effect\":\"NoSchedule\"}]"
+                        }
+                    },
+                    "spec": {
+                        "volumes": [
+                            {
+                                "name": "kubeconfig",
+                                "hostPath": {
+                                    "path": "/etc/kubernetes/kubelet.conf"
+                                }
+                            },
+                            {
+                                "name": "dbus",
+                                "hostPath": {
+                                    "path": "/var/run/dbus"
+                                }
+                            }
+                        ],
+                        "containers": [
+                            {
+                                "name": "kube-proxy",
+                                "image": "192.168.1.12/tenx_containers/kube-proxy-amd64:v1.4.1",
+                                "command": [
+                                    "/usr/local/bin/kube-proxy",
+                                    "--v=1",
+                                    "--kubeconfig=/run/kubeconfig",
+                                    "--proxy-mode=iptables"
+                                ],
+                                "resources": {},
+                                "volumeMounts": [
+                                    {
+                                        "name": "dbus",
+                                        "mountPath": "/var/run/dbus"
+                                    },
+                                    {
+                                        "name": "kubeconfig",
+                                        "mountPath": "/run/kubeconfig"
+                                    }
+                                ],
+                                "terminationMessagePath": "/dev/termination-log",
+                                "imagePullPolicy": "IfNotPresent",
+                                "securityContext": {
+                                    "privileged": true
+                                }
+                            }
+                        ],
+                        "restartPolicy": "Always",
+                        "terminationGracePeriodSeconds": 30,
+                        "dnsPolicy": "ClusterFirst",
+                        "nodeSelector": {
+                            "beta.kubernetes.io/arch": "arm"
+                        },
+                        "hostNetwork": true,
+                        "securityContext": {}
+                    }
+                }
+            },
+            "status": {
+                "currentNumberScheduled": 0,
+                "numberMisscheduled": 0,
+                "desiredNumberScheduled": 0
+            }
+        },
+        {
+            "kind": "DaemonSet",
+            "apiVersion": "extensions/v1beta1",
+            "metadata": {
+                "name": "kube-proxy-arm64",
+                "namespace": "kube-system",
+                "selfLink": "/apis/extensions/v1beta1/namespaces/kube-system/daemonsets/kube-proxy-arm64",
+                "uid": "08c04e96-49c5-11e7-be16-005056852bc9",
+                "resourceVersion": "157",
+                "generation": 1,
+                "creationTimestamp": "2017-06-05T08:00:26Z",
+                "labels": {
+                    "component": "kube-proxy-arm64",
+                    "k8s-app": "kube-proxy-arm64",
+                    "kubernetes.io/cluster-service": "true",
+                    "name": "kube-proxy-arm64",
+                    "tier": "node"
+                }
+            },
+            "spec": {
+                "selector": {
+                    "matchLabels": {
+                        "component": "kube-proxy-arm64",
+                        "k8s-app": "kube-proxy-arm64",
+                        "kubernetes.io/cluster-service": "true",
+                        "name": "kube-proxy-arm64",
+                        "tier": "node"
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "creationTimestamp": null,
+                        "labels": {
+                            "component": "kube-proxy-arm64",
+                            "k8s-app": "kube-proxy-arm64",
+                            "kubernetes.io/cluster-service": "true",
+                            "name": "kube-proxy-arm64",
+                            "tier": "node"
+                        },
+                        "annotations": {
+                            "scheduler.alpha.kubernetes.io/tolerations": "[{\"key\":\"dedicated\",\"value\":\"master\",\"effect\":\"NoSchedule\"}]"
+                        }
+                    },
+                    "spec": {
+                        "volumes": [
+                            {
+                                "name": "kubeconfig",
+                                "hostPath": {
+                                    "path": "/etc/kubernetes/kubelet.conf"
+                                }
+                            },
+                            {
+                                "name": "dbus",
+                                "hostPath": {
+                                    "path": "/var/run/dbus"
+                                }
+                            }
+                        ],
+                        "containers": [
+                            {
+                                "name": "kube-proxy",
+                                "image": "192.168.1.12/tenx_containers/kube-proxy-amd64:v1.4.1",
+                                "command": [
+                                    "/usr/local/bin/kube-proxy",
+                                    "--v=1",
+                                    "--kubeconfig=/run/kubeconfig",
+                                    "--proxy-mode=iptables"
+                                ],
+                                "resources": {},
+                                "volumeMounts": [
+                                    {
+                                        "name": "dbus",
+                                        "mountPath": "/var/run/dbus"
+                                    },
+                                    {
+                                        "name": "kubeconfig",
+                                        "mountPath": "/run/kubeconfig"
+                                    }
+                                ],
+                                "terminationMessagePath": "/dev/termination-log",
+                                "imagePullPolicy": "IfNotPresent",
+                                "securityContext": {
+                                    "privileged": true
+                                }
+                            }
+                        ],
+                        "restartPolicy": "Always",
+                        "terminationGracePeriodSeconds": 30,
+                        "dnsPolicy": "ClusterFirst",
+                        "nodeSelector": {
+                            "beta.kubernetes.io/arch": "arm64"
+                        },
+                        "hostNetwork": true,
+                        "securityContext": {}
+                    }
+                }
+            },
+            "status": {
+                "currentNumberScheduled": 0,
+                "numberMisscheduled": 0,
+                "desiredNumberScheduled": 0
+            }
+        },
+        {
+            "kind": "DaemonSet",
+            "apiVersion": "extensions/v1beta1",
+            "metadata": {
+                "name": "kubectl",
+                "namespace": "kube-system",
+                "selfLink": "/apis/extensions/v1beta1/namespaces/kube-system/daemonsets/kubectl",
+                "uid": "08ebc7af-49c5-11e7-be16-005056852bc9",
+                "resourceVersion": "665",
+                "generation": 1,
+                "creationTimestamp": "2017-06-05T08:00:26Z",
+                "labels": {
+                    "app": "kubectl",
+                    "use": "webt"
+                }
+            },
+            "spec": {
+                "selector": {
+                    "matchLabels": {
+                        "app": "kubectl",
+                        "use": "webt"
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "creationTimestamp": null,
+                        "labels": {
+                            "app": "kubectl",
+                            "use": "webt"
+                        }
+                    },
+                    "spec": {
+                        "volumes": [
+                            {
+                                "name": "docker-sock",
+                                "hostPath": {
+                                    "path": "/var/run/docker.sock"
+                                }
+                            }
+                        ],
+                        "containers": [
+                            {
+                                "name": "service-proxy",
+                                "image": "192.168.1.12/tenx_containers/kubectl:1.0.webt",
+                                "resources": {},
+                                "volumeMounts": [
+                                    {
+                                        "name": "docker-sock",
+                                        "mountPath": "/var/run/docker.sock"
+                                    }
+                                ],
+                                "terminationMessagePath": "/dev/termination-log",
+                                "imagePullPolicy": "IfNotPresent"
+                            }
+                        ],
+                        "restartPolicy": "Always",
+                        "terminationGracePeriodSeconds": 30,
+                        "dnsPolicy": "ClusterFirst",
+                        "securityContext": {}
+                    }
+                }
+            },
+            "status": {
+                "currentNumberScheduled": 3,
+                "numberMisscheduled": 0,
+                "desiredNumberScheduled": 3
+            }
+        },
+        {
+            "kind": "DaemonSet",
+            "apiVersion": "extensions/v1beta1",
+            "metadata": {
+                "name": "service-proxy",
+                "namespace": "kube-system",
+                "selfLink": "/apis/extensions/v1beta1/namespaces/kube-system/daemonsets/service-proxy",
+                "uid": "08d82856-49c5-11e7-be16-005056852bc9",
+                "resourceVersion": "1446",
+                "generation": 1,
+                "creationTimestamp": "2017-06-05T08:00:26Z",
+                "labels": {
+                    "name": "service-proxy"
+                }
+            },
+            "spec": {
+                "selector": {
+                    "matchLabels": {
+                        "name": "service-proxy"
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "creationTimestamp": null,
+                        "labels": {
+                            "name": "service-proxy"
+                        },
+                        "annotations": {
+                            "scheduler.alpha.kubernetes.io/affinity": "{\"nodeAffinity\":{\"requiredDuringSchedulingIgnoredDuringExecution\":{\"nodeSelectorTerms\":[{\"matchExpressions\":[{\"key\":\"role\",\"operator\":\"In\",\"values\":[\"proxy\"]}]}]}}}"
+                        }
+                    },
+                    "spec": {
+                        "volumes": [
+                            {
+                                "name": "docker-sock",
+                                "emptyDir": {}
+                            },
+                            {
+                                "name": "config-volume",
+                                "hostPath": {
+                                    "path": "/var/run/docker.sock"
+                                }
+                            },
+                            {
+                                "name": "kube-config",
+                                "configMap": {
+                                    "name": "kube-config",
+                                    "defaultMode": 420
+                                }
+                            }
+                        ],
+                        "containers": [
+                            {
+                                "name": "service-proxy",
+                                "image": "192.168.1.12/tenx_containers/tenx-proxy:v1.0.0",
+                                "command": [
+                                    "/run.sh",
+                                    "--plugins=prohaproxy --watch=watchsrvs --emailReceiver=yangle@tenxcloud.com --config=/etc/tenx/domain.json"
+                                ],
+                                "resources": {},
+                                "volumeMounts": [
+                                    {
+                                        "name": "docker-sock",
+                                        "mountPath": "/var/run/docker.sock"
+                                    },
+                                    {
+                                        "name": "kube-config",
+                                        "mountPath": "/etc/tenx/"
+                                    }
+                                ],
+                                "terminationMessagePath": "/dev/termination-log",
+                                "imagePullPolicy": "IfNotPresent"
+                            }
+                        ],
+                        "restartPolicy": "Always",
+                        "terminationGracePeriodSeconds": 30,
+                        "dnsPolicy": "ClusterFirst",
+                        "nodeSelector": {
+                            "role": "proxy"
+                        },
+                        "hostNetwork": true,
+                        "securityContext": {}
+                    }
+                }
+            },
+            "status": {
+                "currentNumberScheduled": 1,
+                "numberMisscheduled": 0,
+                "desiredNumberScheduled": 1
+            }
+        }
+    ]
+}

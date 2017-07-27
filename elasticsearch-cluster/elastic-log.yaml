@@ -1,0 +1,66 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+  generation: 2
+  labels:
+    k8s-app: elasticsearch-logging
+  name: elasticsearch-logging-v1
+  namespace: kube-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: elasticsearch-logging
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        k8s-app: elasticsearch-logging
+    spec:
+      containers:
+      - args:
+        - --network.host=0.0.0.0
+        image: 192.168.1.12/tenx_containers/elasticsearch:latest
+        imagePullPolicy: Always
+        lifecycle:
+          postStart:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - 'sleep 120 && curl -XPOST localhost:9200/_template/tenx_template -d ''{ "template":
+                "logstash-*", "settings": { "index": { "analysis": { "analyzer": {
+                "tenx_analyzer": { "filter": [ "standard", "lowercase", "stop" ],
+                "char_filter": [ "my_filter" ], "type": "custom", "tokenizer": "standard"
+                } }, "char_filter": { "my_filter": { "type": "mapping", "mappings":
+                [ "-=>_" ] } } } } }, "mappings": { "_default_": { "dynamic_templates":
+                [ { "template_1": { "mapping": { "index": "not_analyzed", "type":
+                "string" }, "match_mapping_type": "string", "match": "*" } } ] } }}'''
+        name: elasticsearch-logging
+        ports:
+        - containerPort: 9200
+          name: db
+          protocol: TCP
+        - containerPort: 9300
+          name: transport
+          protocol: TCP
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        volumeMounts:
+        - mountPath: /usr/share/elasticsearch/data
+          name: es-persistent-storage
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - hostPath:
+          path: /paas/elasticsearch_data
+        name: es-persistent-storage
