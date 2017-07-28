@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
       - name: fluentd-elk
-        image: 192.168.1.12/tenx_containers/fluentd-elasticsearch:hosting
+        image: 192.168.1.12/test_containers/fluentd-elasticsearch:hosting
         terminationMessagePath: /dev/termination-log
         volumeMounts:
         - name: varlog
