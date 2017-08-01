@@ -115,5 +115,28 @@
 
 
 
+** prometheus 查询
+
+*** metric type
+   - Counter: 用于累计计数，例如用来记录请求次数。Counter 的特点是一直增加不会减少。
+   - Gauge：用于记录常规数值，可以增加或减少。例如用来记录 CPU、内存的变化
+   - Histogram：可理解为直方图，常用于跟踪事件发生的规模，如请求耗时、响应大小。可对记录的内容分组和聚合(count,sum 等)，例如响应时间小于 500 毫秒的多少次、500 毫秒~1000 毫秒之间多少次、1000 毫秒以上的多少次
+   - Summary：与 Histogram 类似，但支持按百分比跟踪结果
+*** job and instance
+    在 Prometheus 中任何被采集的目标 Target 被称为 Instance，通常对应单个进程。 相同类型的 Instance 被称为 Job，例如：
+    #+BEGIN_SRC yaml
+      - job: api-server
+       - instance 1: 1.2.3.4:5670
+       - instance 2: 1.2.3.4:5671
+       - instance 3: 5.6.7.8:5670
+       - instance 4: 5.6.7.8:5671
+    #+END_SRC
+    Prometheus 在从目标采集数据时会自动附加一些标签，用于识别被采集的目标：
+    - job：配置的 job 名称
+    - instance：<host>:<port> 或者 domain_name
+*** operator
+    - rate: method_code:http_errors:rate5m{code="500"}
+     This returns a result vector containing the fraction of HTTP requests with status code of 500 for each
+     method, as measured over the last 5 minutes.
 
 ** 常见问题以及解决方式
