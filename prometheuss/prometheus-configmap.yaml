@@ -28,15 +28,6 @@ data:
       kubernetes_sd_configs:
       - role: node
       relabel_configs:
-      - source_labels: [__address__]
-        regex: ^(.*):\d+$
-        target_label: __address__
-        replacement: $1:9100
-      - target_label: __scheme__
-        replacement: http
-      # Host name
-      - source_labels: [__meta_kubernetes_node_name]
-        target_label: instance
       - action: labelmap
         regex: __meta_kubernetes_node_label_(.+)
 
@@ -114,3 +105,7 @@ data:
       - source_labels: [__meta_kubernetes_pod_name]
         action: replace
         target_label: kubernetes_pod_name
+      # put instance name set to node name
+      - source_labels: [__meta_kubernetes_pod_node_name]
+        action: replace
+        target_label: instance

@@ -9,7 +9,6 @@
     执行以上操作后，通过访问 http://masterIP:30900／targets 进入 targets 监控见面，查看 target 的 State 是否为
     UP 状态，假如都为 UP，这时即可到 prometheus 总览界面查询所需要的数据。
 
-
 *** daemonSet 方式
     1. kubectl create -f  prometheus-configmap.yaml
     2. kubectl create -f prometheus-config-rule.yaml
@@ -18,12 +17,69 @@
     执行以上操作后，通过访问 http://masterIP:30900／targets 进入 targets 监控见面，查看 target 的 State 是否为
     UP 状态，假如都为 UP，这时即可到 prometheus 总览界面查询所需要的数据。
 
-
 *** 支持 Node 上的磁盘 IO，网络吞吐等监控
     - 目前默认支持的功能：https://github.com/prometheus/node_exporter#enabled-by-default
     - 默认 diable 的功能：https://github.com/prometheus/node_exporter#disabled-by-default
     - node-exporter 使用 daemonSet 方式启动，配置文件见附录
     - kubectl create -f ./prometheus-node-exporter.yaml
+      node-exporter 主要是通过在 pod 中添加*"prometheus.io/scrape:"true"*,然后 configmap job_name 为 kubernetes-pods
+      中，设置如下配置，prometheus 则会从凡是设置了"prometheus.io/scrape:"true 的 pod 都会 scrape 数据
+      #+BEGIN_SRC yaml
+              - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+                action: keep
+                regex: true
+
+      #+END_SRC
+     - node-exporter 的配置
+      #+BEGIN_SRC yaml
+        apiVersion: v1
+        kind: Service
+        metadata:
+          annotations:
+            prometheus.io/scrape: "true"
+          labels:
+            app: node-exporter
+            name: node-exporter
+          name: node-exporter
+          namespace: kube-system
+        spec:
+          clusterIP: None
+          ports:
+          - name: scrape
+            port: 9100
+            protocol: TCP
+          selector:
+            app: node-exporter
+          type: ClusterIP
+        #----
+        apiVersion: extensions/v1beta1
+        kind: DaemonSet
+        metadata:
+          name: node-exporter
+          namespace: kube-system
+        spec:
+          template:
+            metadata:
+              labels:
+                app: node-exporter
+              name: node-exporter
+              annotations:
+                prometheus.io/scrape: "true"
+            spec:
+              containers:
+              - image: 192.168.1.12/tenx_containers/node-exporter:v0.14.0
+                name: node-exporter
+                securityContext:
+                  privileged: true
+                ports:
+                - containerPort: 9100
+                  hostPort: 9100
+                  name: scrape
+              hostNetwork: true
+              hostPID: true
+      #+END_SRC
+
+
 *** 调优
 **** 内存调优
      https://prometheus.io/docs/operating/storage/
