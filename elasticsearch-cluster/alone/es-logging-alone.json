@@ -1,0 +1,31 @@
+{
+    "kind": "Service",
+    "apiVersion": "v1",
+    "metadata": {
+        "name": "elasticsearch-logging",
+        "namespace": "kube-system",
+        "labels": {
+            "k8s-app": "elasticsearch-logging",
+            "plugin": "elasticsearch-logging"
+        }
+    },
+    "spec": {
+        "ports": [
+            {
+                "name": "db",
+                "protocol": "TCP",
+                "port": 9200,
+                "targetPort": 9200
+            }
+        ],
+        "selector": {
+            "k8s-app": "elasticsearch-logging"
+        },
+        "clusterIP": "10.8.67.120",
+        "type": "ClusterIP",
+        "sessionAffinity": "None"
+    },
+    "status": {
+        "loadBalancer": {}
+    }
+}

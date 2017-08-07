@@ -1,0 +1,106 @@
+{
+    "kind": "Deployment",
+    "apiVersion": "extensions/v1beta1",
+    "metadata": {
+        "name": "elasticsearch-logging",
+        "namespace": "kube-system",
+        "labels": {
+            "k8s-app": "elasticsearch-logging",
+            "plugin": "elasticsearch-logging"
+        },
+        "annotations": {
+            "deployment.kubernetes.io/revision": "1"
+        }
+    },
+    "spec": {
+        "replicas": 1,
+        "selector": {
+            "matchLabels": {
+                "k8s-app": "elasticsearch-logging",
+                "plugin": "elasticsearch-logging"
+            }
+        },
+        "template": {
+            "metadata": {
+                "labels": {
+                    "k8s-app": "elasticsearch-logging",
+                    "plugin": "elasticsearch-logging"
+                }
+            },
+            "spec": {
+                "volumes": [
+                    {
+                        "name": "es-persistent-storage",
+                        "hostPath": {
+                            "path": "/paas/elasticsearch_data"
+                        }
+                    }
+                ],
+                "containers": [
+                    {
+                        "name": "elasticsearch-logging",
+                        "image": "192.168.1.12/tenx_containers/elasticsearch:2.4.4-alpine.tenx",
+                        "args": [
+                            "--network.host=0.0.0.0"
+                        ],
+                        "ports": [
+                            {
+                                "name": "db",
+                                "containerPort": 9200,
+                                "protocol": "TCP"
+                            },
+                            {
+                                "name": "transport",
+                                "containerPort": 9300,
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "env": [
+                            {
+                                "name": "ES_HEAP_SIZE",
+                                "value": "2g"
+                            }
+                        ],
+                        "resources": {},
+                        "volumeMounts": [
+                            {
+                                "name": "es-persistent-storage",
+                                "mountPath": "/usr/share/elasticsearch/data"
+                            }
+                        ],
+                        "lifecycle": {
+                            "postStart": {
+                                "exec": {
+                                    "command": [
+                                        "/bin/sh",
+                                        "-c",
+                                        "sleep 120 \u0026\u0026 curl localhost:9200/_template/tenx_template -d '{ \"template\": \"logstash-*\", \"settings\": { \"index\": { \"analysis\": { \"analyzer\": { \"tenx_analyzer\": { \"filter\": [ \"standard\", \"lowercase\", \"stop\" ], \"char_filter\": [ \"my_filter\" ], \"type\": \"custom\", \"tokenizer\": \"standard\" } }, \"char_filter\": { \"my_filter\": { \"type\": \"mapping\", \"mappings\": [ \"-=\u003e_\" ] } } } } }, \"mappings\": { \"_default_\": { \"dynamic_templates\": [ { \"template_1\": { \"mapping\": { \"index\": \"not_analyzed\", \"type\": \"string\" }, \"match_mapping_type\": \"string\", \"match\": \"*\" } } ] } }}'"
+                                    ]
+                                }
+                            }
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "imagePullPolicy": "IfNotPresent"
+                    }
+                ],
+                "restartPolicy": "Always",
+                "terminationGracePeriodSeconds": 30,
+                "dnsPolicy": "ClusterFirst",
+                "securityContext": {}
+            }
+        },
+        "strategy": {
+            "type": "RollingUpdate",
+            "rollingUpdate": {
+                "maxUnavailable": 1,
+                "maxSurge": 1
+            }
+        }
+    },
+    "status": {
+        "observedGeneration": 2,
+        "replicas": 1,
+        "updatedReplicas": 1,
+        "availableReplicas": 1
+    }
+}
