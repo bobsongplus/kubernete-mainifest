@@ -140,3 +140,10 @@
      method, as measured over the last 5 minutes.
 
 ** 常见问题以及解决方式
+*** prometheus container cannot get fs
+**** "Report container FS metrics into prometheus /metrics by smarterclayton · Pull Request #1642 · google/cadvisor"
+ 	  https://github.com/google/cadvisor/pull/1642
+**** "no fs stats per container · Issue #1403 · google/cadvisor"
+ 	   https://github.com/google/cadvisor/issues/1403
+**** "/metrics container_fs_reads_total is 0 · Issue #1669 · google/cadvisor"
+ 	   https://github.com/google/cadvisor/issues/1669
