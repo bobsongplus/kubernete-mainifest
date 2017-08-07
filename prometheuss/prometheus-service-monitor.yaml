@@ -1,0 +1,17 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: prometheus-monitor
+  namespace: kube-system
+  labels:
+    plugin: prometheus
+spec:
+  sessionAffinity: ClientIP
+  type: NodePort
+  ports:
+  - name: prometheus
+    protocol: TCP
+    port: 9090
+    nodePort: 30900
+  selector:
+    plugin: prometheus
