@@ -147,3 +147,18 @@
  	   https://github.com/google/cadvisor/issues/1403
 **** "/metrics container_fs_reads_total is 0 · Issue #1669 · google/cadvisor"
  	   https://github.com/google/cadvisor/issues/1669
+** prometheus some exporter
+   + Node/system metrics exporter
+   + AWS CloudWatch exporter
+   + Blackbox exporter
+   + Collectd exporter
+   + Consul exporter
+   + Graphite exporter
+   + HAProxy exporter
+   + InfluxDB exporter
+   + JMX exporter
+   + Memcached exporter
+   + Mesos task exporter
+   + MySQL server exporter
+   + SNMP exporter
+   + StatsD exporter
