@@ -1,0 +1,136 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    tenxcloud.com/schemaPortname: rediscluster/TCP
+    system/lbgroup: none
+  name: rediscluster-gkiud
+  labels:
+    app: rediscluster-gkiud
+spec:
+  ports:
+    - port: 6379
+      name: rediscluster
+  selector:
+    app: rediscluster
+  externalIPs:
+    - 11.11.1.1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
+  name: rediscluster
+  labels:
+    app: rediscluster
+spec:
+  ports:
+  - port: 6379
+    name: peer
+  # *.redis.default.svc.cluster.local
+  clusterIP: None
+  selector:
+    app: rediscluster
+---
+apiVersion: apps/v1beta1
+kind: StatefulSet
+metadata:
+  name: rediscluster
+spec:
+  serviceName: rediscluster
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: rediscluster
+      annotations:
+        pod.alpha.kubernetes.io/initialized: "true"
+        pod.alpha.kubernetes.io/init-containers: '[
+            {
+                "name": "install",
+                "image": "192.168.1.52/tenx_containers/redis-install:0.2",
+                "imagePullPolicy": "Always",
+                "args": ["--version=3.2.0", "--install-into=/opt", "--work-dir=/work-dir"],
+                "env": [
+                  {
+                      "name": "REDIS_PASSWORD",
+                      "value": "123123"
+                   }
+                ],
+                "volumeMounts": [
+                    {
+                        "name": "opt",
+                        "mountPath": "/opt"
+                    },
+                    {
+                        "name": "workdir",
+                        "mountPath": "/work-dir"
+                    }
+                ]
+            },
+            {
+                "name": "bootstrap",
+                "image": "192.168.1.52/tenx_containers/debian:jessie",
+                "command": ["/work-dir/peer-finder"],
+                "args": ["-on-start=\"/work-dir/on-start.sh\"", "-service=rediscluster"],
+                "env": [
+                  {
+                      "name": "POD_NAMESPACE",
+                      "valueFrom": {
+                          "fieldRef": {
+                              "apiVersion": "v1",
+                              "fieldPath": "metadata.namespace"
+                          }
+                      }
+                   }
+                ],
+                "volumeMounts": [
+                    {
+                        "name": "opt",
+                        "mountPath": "/opt"
+                    },
+                    {
+                        "name": "workdir",
+                        "mountPath": "/work-dir"
+                    }
+                ]
+            }
+        ]'
+    spec:
+      containers:
+      - name: rediscluster
+        image: 192.168.1.52/tenx_containers/debian:jessie
+        ports:
+        - containerPort: 6379
+          name: peer
+        resources:
+          limits:
+            memory: '512Mi'
+          requests:
+            cpu: 250m
+            memory: '512Mi'
+        command:
+        - /opt/redis/redis-server
+        args:
+        - /opt/redis/redis.conf
+        volumeMounts:
+        - name: datadir
+          mountPath: /data
+        - name: opt
+          mountPath: /opt
+      volumes:
+      - name: opt
+        emptyDir: {}
+      - name: workdir
+        emptyDir: {}
+      - name: datadir
+        emptyDir: {}
+  volumeClaimTemplates:
+  - metadata:
+      name: datadir
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 512Mi

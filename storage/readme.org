@@ -1,0 +1,173 @@
+** ceph
+*** 常用命令
+   1. ceph 运维常用指令
+  	   - http://zhanguo1110.blog.51cto.com/5750817/1543032
+      - http://linuxnote.blog.51cto.com/9876511/1788361
+*** 集群
+    1. 启动 mon 进程 service ceph start  mon.node1
+    2. 启动 msd 进程 service ceph start mds.node1
+    3. 启动 osd 进程 service ceph start osd.0
+    4. 查看机器的监控状态 ceph health
+    5. 查看 ceph 的实时运行状态: ceph -w
+    6. 检查信息状态信息: ceph -s
+    7. 查看 ceph 存储空间 ceph df
+    8. 删除一个节点的所有的 ceph 数据包: ceph-deploy purge node1
+    9. 为 ceph 创建一个 admin 用户并为 admin 用户创建一个密钥，把密钥保存到/etc/ceph 目
+       录下：ceph auth get-or-create client.admin mds 'allow' osd 'allow *' mon
+       'allow *' > /etc/ceph/ceph.client.admin.keyring 或 ceph auth get-or-create client.admin mds 'allow' osd 'allow *' mon 'allow *' -o /etc/ceph/ceph.client.admin.keyring
+    10. 为 osd.0 创建一个用户并创建一个 key: ceph auth get-or-create osd.0 mon 'allow rwx' osd 'allow *' -o /var/lib/ceph/osd/ceph-0/keyring
+    11. 为 mds.node1 创建一个用户并创建一个 key: ceph auth get-or-create mds.node1 mon 'allow rwx' osd 'allow *' mds 'allow *' -o /var/lib/ceph/mds/ceph-node1/keyring
+    12. 查看 ceph 集群中的认证用户及相关的 key: ceph auth list
+    13. 删除集群中的一个认证用户: ceph auth del osd.0
+    14. 查看集群的详细配置: ceph daemon mon.node1 config show | more
+    15. 查看集群健康状态细节: ceph health detail
+    16. 查看 ceph log 日志所在的目录:  ceph-conf --name mon.node1 --show-config-value log_file ceph-conf --name mon.node1 --show-config-value log_file
+    17.
+
+** PV & PVC
+*** 介绍
+    PersistentVolume（pv）和 PersistentVolumeClaim（pvc）是 k8s 提供的两种 API 资
+    源，用于抽象存储细节。管理员关注于如何通过 pv 提供存储功能而无需关注用户如何
+    使用，同样的用户只需要挂载 pvc 到容器中而不需要关注存储卷采用何种技术实现。
+    pvc 和 pv 的关系与 pod 和 node 关系类似，前者消耗后者的资源。pvc 可以向 pv 申
+    请指定大小的存储资源并设置访问模式,这就可以通过 Provision -> Claim
+    的方式，来对存储资源进行控制。
+*** 声明周期
+    + 供应准备。通过集群外的存储系统或者云平台来提供存储持久化支持。
+      - 静态提供：管理员手动创建多个 PV，供 PVC 使用。
+      - 动态提供：动态创建 PVC 特定的 PV，并绑定。 (通过 storageClasses 实现)
+    + 绑定。用户创建 pvc 并指定需要的资源和访问模式。在找到可用 pv 之前，pvc 会保
+      持未绑定状态。
+    + 使用。用户可在 pod 中像 volume 一样使用 pvc。
+    + 释放。用户删除 pvc 来回收存储资源，pv 将变成“released”状态。由于还保留着
+      之前的数据，这些数据需要根据不同的策略来处理，否则这些存储资源无法被其他
+      pvc 使用。
+    + 回收(Reclaiming)。pv 可以设置三种回收策略：保留（Retain），回收（Recycle）
+      和删除（Delete）
+      - 保留策略：允许人工处理保留的数据。
+      - 删除策略：将删除 pv 和外部关联的存储资源，需要插件支持。
+      - 回收策略：将执行清除操作，之后可以被新的 pvc 使用，需要插件支持。
+
+   目前只有 NFS 和 HostPath 类型卷支持回收策略，AWS EBS,GCE PD,Azure Disk 和 Cinder 支持删除(Delete)策略。
+
+ claims must exist in the same namespaces as the pod using the claim
+
+ claims & volumes
+
+ #+BEGIN_SRC yaml
+   kind: Pod
+   apiVersion: v1
+   metadata:
+     name: mypod
+   spec:
+     containers:
+       - name: myfrontend
+         image: dockerfile/nginx
+         volumeMounts:
+         - mountPath: "/var/www/html"
+           name: mypd
+     volumes:
+       - name: mypd
+         persistentVolumeClaim:
+           claimName: myclaim
+ #+END_SRC
+
+*** 实验操作
+    首先创建 pv， 然后创建 pvc， 然后创建 pod 时，通过 volume 的挂载方式实现挂载
+    卷, 这个例子是使用的的 volume 是 host 模式，所以当创建完 pod 后，会在运行 pod 的 node
+    节点上存在/tmp/data 目录，这时你通过*echo 'Hello from Kubernetes storage' >
+    /tmp/data/index.html*方式在／tmp/data 目录下创建一个 index.html,然后进入到
+    container 中，安装 curl 命令， 执行 curl localhost，则会返回 index.html 中的内容
+**** 创建 pv
+    The configuration file specifies that the volume is at /tmp/data on the the
+    cluster’s Node. The configuration also specifies a size of 10 gibibytes and
+    an access mode of ReadWriteOnce, which means the volume can be mounted as
+    read-write by a single Node. It defines the StorageClass name manual for the
+    PersistentVolume, which will be used to bind PersistentVolumeClaim requests
+    to this PersistentVolume.
+
+     #+BEGIN_SRC yaml
+       kind: PersistentVolume
+       apiVersion: v1
+       metadata:
+         name: task-pv-volume
+         labels:
+           type: local
+       spec:
+         storageClassName: manual
+         capacity:
+           storage: 10Gi
+         accessModes:
+           - ReadWriteOnce
+         hostPath:
+           path: "/tmp/data"
+     #+END_SRC
+**** 创建 pvc
+     After you create the PersistentVolumeClaim, the Kubernetes control plane
+     looks for a PersistentVolume that satisfies the claim’s requirements. If
+     the control plane finds a suitable PersistentVolume with the same
+     StorageClass, it binds the claim to the volume.
+
+     #+BEGIN_SRC yaml
+       kind: PersistentVolumeClaim
+       apiVersion: v1
+       metadata:
+         name: task-pv-claim
+       spec:
+         storageClassName: manual
+         accessModes:
+           - ReadWriteOnce
+         resources:
+           requests:
+             storage: 3Gi
+     #+END_SRC
+**** 创建 pod
+
+     #+BEGIN_SRC yaml
+       kind: Pod
+       apiVersion: v1
+       metadata:
+         name: task-pv-pod
+       spec:
+
+         volumes:
+           - name: task-pv-storage
+             persistentVolumeClaim:
+              claimName: task-pv-claim
+
+         containers:
+           - name: task-pv-container
+             image: nginx
+             ports:
+               - containerPort: 80
+                 name: "http-server"
+             volumeMounts:
+             - mountPath: "/usr/share/nginx/html"
+               name: task-pv-storage
+     #+END_SRC
+
+
+*** 参考
+**** "Persistent Volumes - Kubernetes"
+ 	   https://kubernetes.io/docs/concepts/storage/persistent-volumes/#class
+**** pv 介绍
+     http://www.jianshu.com/p/fda9de00ba5f
+**** class
+     A PV can have a class, which is specified by setting the storageClassName
+     attribute to the name of a StorageClass. A PV of a particular class can only
+     be bound to PVCs requesting that class. A PV with no storageClassName has no
+     class and can only be bound to PVCs that request no particular class.
+**** mount options
+     You can specify a mount option by using the annotation:
+     volume.beta.kubernetes.io/mount-options, A mount option is a string which
+     will be cumulatively joined and used while mounting volume to the disk.Note
+     that not all Persistent volume types support mount
+     options.see:https://kubernetes.io/docs/concepts/storage/persistent-volumes/#mountoptions
+
+** storageclass
+   1. "在Kubernetes中使用Sateful Set部署Redis_Kubernetes中文社区"
+ 	  https://www.kubernetes.org.cn/2516.html
+
+** rbd question
+***  Error creating rbd image: executable file not found in $PATH · Issue #38923 · kubernetes/kubernetes
+ 	  https://github.com/kubernetes/kubernetes/issues/38923
