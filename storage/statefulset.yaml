@@ -51,7 +51,6 @@ spec:
                 "name": "install",
                 "image": "192.168.1.52/tenx_containers/redis-install:0.2",
                 "imagePullPolicy": "Always",
-                "args": ["--version=3.2.0", "--install-into=/opt", "--work-dir=/work-dir"],
                 "env": [
                   {
                       "name": "REDIS_PASSWORD",
@@ -130,7 +129,8 @@ spec:
   - metadata:
       name: datadir
     spec:
-      accessModes: [ "ReadWriteOnce" ]
+      accessModes: [ "ReadWriteMany" ]
+      storageClassName: tenx-rbd
       resources:
         requests:
           storage: 512Mi
