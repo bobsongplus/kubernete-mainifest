@@ -2,9 +2,11 @@ kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
   name: task-pv-claim
+  namespace: default
 spec:
   accessModes:
     - ReadWriteOnce
+  storageClassName: tenx-rbd
   resources:
     requests:
       storage: 3Gi

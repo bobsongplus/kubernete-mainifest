@@ -2,10 +2,11 @@ kind: PersistentVolume
 apiVersion: v1
 metadata:
   name: task-pv-volume
+  namespace: abcdef
   labels:
     type: local
 spec:
-  storageClassName: manual
+  storageClassName: tenx-rbd
   capacity:
     storage: 10Gi
   accessModes:
