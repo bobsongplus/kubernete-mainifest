@@ -2,7 +2,6 @@ kind: Pod
 apiVersion: v1
 metadata:
   name: task-pv-pod
-  namespace: abcdef
 spec:
 
   volumes:

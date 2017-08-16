@@ -112,18 +112,18 @@
 *** TODO in-tree
 *** TODO out-of-tree
 ** rbd question
-*** TODO Error creating rbd image: executable file not found in $PATH · Issue #38923 · kubernetes/kubernetes
+*** Error creating rbd image: executable file not found in $PATH · Issue #38923 · kubernetes/kubernetes
  	  https://github.com/kubernetes/kubernetes/issues/38923
 *** rbd 在线扩容
  	  https://my.oschina.net/oscfox/blog/312220
-***  "ceph-rbd 常用命令
+*** ceph-rbd 常用命令
  	  https://ztjlovejava.github.io/2015/03/29/Ceph-rbd-cmd/
 ** statefulset
 *** pvc will not delete when statefulset be deleted
-    *Deleting and/or scaling a StatefulSet down will not delete the volumes
+    Deleting and/or scaling a StatefulSet down will not delete the volumes
    associated with the StatefulSet. This is done to ensure data safety, which is
    generally more valuable than an automatic purge of all related StatefulSet
-   resources.*
+   resources.
 *** headless service be required
     *A Headless Service, named nginx, is used to control the network domain.*
 *** Note
@@ -142,7 +142,7 @@
 
 
 ** storageclass 使用到项目中
-*** kube-controller-manager 中需要集成 rbd 命令
+*** kube-controller-manager 和 kubelet 的容器或主机 中需要集成 rbd 命令
     + Volume Provisioning: Currently, if you want dynamic provisioning, RBD
       provisioner in controller-manager needs to access rbd binary to create new
       image in ceph cluster for your PVC.external-storage plans to move volume
@@ -160,6 +160,8 @@
        这个 secret 是通过 ceph auth list 中的 key 通过 base64 计算的到
     2. 若 pod 中的 volume 使用的 pvc 是通过 storageclass 创建的来，那么就需要在 pod 所在通
        过存在 secret 和 storageclass,否则 pod mount 不上 pvc
+    3. kube-controller-manager 和 kubelet 的容器或主机 中需要集成 rbd 命令
+     *请参考：https://github.com/kubernetes/kubernetes/issues/38923*
 
 
 *** storageclass 在 statefulset 中的应用
@@ -354,12 +356,199 @@
             - metadata:
                 name: datadir
               spec:
-                accessModes: [ "ReadWriteMany" ]    # jkkkkk
+                accessModes: [ "ReadWriteMany" ]
                 storageClassName: tenx-rbd
-                persistentVolumeReclaimPolicy: Recycle
                 resources:
                   requests:
                     storage: 512Mi
         #+END_SRC
 
 *** storagelcass 在 deployment 中的应用
+    在 deployment 的应用一般时已经创建好了的 pvc-pv，只需要在 deployment yaml 配置
+    的 volumes 域 persistentVolumeClaim->claimName 制定 pvc 名字即可使用
+**** pvc 的创建（及创建存储）
+     当前 pvc 的创建也是基于 storageclass 实现，创建一个名字为 task-pv-claim 的 pvc，yaml 示例：
+     #+BEGIN_SRC yaml
+       kind: PersistentVolumeClaim
+       apiVersion: v1
+       metadata:
+         name: task-pv-claim
+         namespace: default
+       spec:
+         accessModes:
+           - ReadWriteOnce
+         storageClassName: tenx-rbd
+         resources:
+           requests:
+             storage: 3Gi
+     #+END_SRC
+     pvc 的 ns 为 default，这时则可以看到 pvc 已经创建成功，并且已经 bound 上 pv 了
+
+     #+BEGIN_SRC sh
+       $song in storage  on master ● λ kubectl get pvc
+       kuNAME                     STATUS    VOLUME                                     CAPACITY   ACCESSMODES   STORAGECLASS   AGE
+       task-pv-claim            Bound     pvc-1a431d74-8226-11e7-bd70-005056850b72   3Gi        RWO           tenx-rbd       1m
+       $song in storage  on master ● λ kubectl describe pvc task-pv-claim
+       Name:		task-pv-claim
+       Namespace:	default
+       StorageClass:	tenx-rbd
+       Status:		Bound
+       Volume:		pvc-1a431d74-8226-11e7-bd70-005056850b72
+       Labels:		<none>
+       Annotations:	pv.kubernetes.io/bind-completed=yes
+           pv.kubernetes.io/bound-by-controller=yes
+           volume.beta.kubernetes.io/storage-provisioner=kubernetes.io/rbd
+       Capacity:	3Gi
+       Access Modes:	RWO
+       Events:
+         FirstSeen	LastSeen	Count	From				SubObjectPath	Type		Reason			Message
+         ---------	--------	-----	----				-------------	--------	------			-------
+         1m		1m		1	persistentvolume-controller			Normal		ProvisioningSucceeded	Successfully provisioned volume pvc-1a431d74-8226-11e7-bd70-005056850b72 using kubernetes.io/rbd
+
+     #+END_SRC
+**** 创建 deployment
+     这里以 pod 为例, yaml 配置为：
+     #+BEGIN_SRC yaml
+       kind: Pod
+       apiVersion: v1
+       metadata:
+         name: task-pv-pod
+       spec:
+
+         volumes:
+           - name: task-pv-storage
+             persistentVolumeClaim:
+              claimName: task-pv-claim
+         containers:
+           - name: task-pv-container
+             image: nginx
+             ports:
+               - containerPort: 80
+                 name: "http-server"
+             volumeMounts:
+             - mountPath: "/usr/share/nginx/html"
+               name: task-pv-storage
+     #+END_SRC
+     这里创建了一个名字为 task-pv-pod 的 pod，通过 persistentVolumeClaim->claimName
+     指定上一步骤中创建的 pvc，即可挂在成功, 注意 namespace 必须要与 pvc 相同
+**** 注意点
+     只要采用了 stroageclass 的存储方式，就需要 secret，在与 pvc 和 pod 同 ns 下，要有相
+     应的 secret
+
+*** storageclass 磁盘扩容
+    目前 kubernets 不支持自动扩容磁盘功能，需要进行手工操作，其中包括：1）手动更改
+    pv 大小,pvc 自动更新容量大小 2）手动更改挂在的磁盘大小(以 ceph 为例，需要更改挂在磁盘的大小)
+
+**** ceph 块设备
+***** ext4 文件系统块设备扩容
+      以上例中基于 ceph 的 storageclass 创建的 deployment 为例：
+****** 准备工作
+******* 查看 pvc 的情况
+        上例中创建的 pvc 为 task-pv-claim
+       #+BEGIN_SRC sh
+         $song in storage  on master ● ● λ kubectl describe pvc task-pv-claim
+         Name:		task-pv-claim
+         Namespace:	default
+         StorageClass:	tenx-rbd
+         Status:		Bound
+         Volume:		pvc-1a431d74-8226-11e7-bd70-005056850b72
+         Labels:		<none>
+         Annotations:	pv.kubernetes.io/bind-completed=yes
+         pv.kubernetes.io/bound-by-controller=yes
+         volume.beta.kubernetes.io/storage-provisioner=kubernetes.io/rbd
+         Capacity:	3Gi
+         Access Modes:	RWO
+         Events:
+         FirstSeen	LastSeen	Count	From				SubObjectPath	Type		Reason			Message
+         ---------	--------	-----	----				-------------	--------	------			-------
+         51m		51m		1	persistentvolume-controller			Normal		ProvisioningSucceeded	Successfully provisioned volume pvc-1a431d74-8226-11e7-bd70-005056850b72 using kubernetes.io/rbd
+       #+END_SRC
+       可看出 pvc 挂在 volume pv 为：pvc-1a431d74-8226-11e7-bd70-005056850b72, 状
+       态为 Bound, StorageClass 为 tenx-rbd, 然后查看 pv 具体挂在的那个 rbd 块
+******* 查看 pv 的情况
+
+        #+BEGIN_SRC sh
+          $song in storage  on master ● ● λ kubectl describe pv pvc-1a431d74-8226-11e7-bd70-005056850b72
+          Name:		pvc-1a431d74-8226-11e7-bd70-005056850b72
+          Labels:		<none>
+          Annotations:	pv.kubernetes.io/bound-by-controller=yes
+          pv.kubernetes.io/provisioned-by=kubernetes.io/rbd
+          StorageClass:	tenx-rbd
+          Status:		Bound
+          Claim:		default/task-pv-claim
+          Reclaim Policy:	Delete
+          Access Modes:	RWO
+          Capacity:	3Gi
+          Message:
+          Source:
+          Type:		RBD (a Rados Block Device mount on the host that shares a pod's lifetime)
+              CephMonitors:	[192.168.0.68:6789 192.168.0.55:6789 192.168.0.94:6789 192.168.0.99:6789]
+              RBDImage:		kubernetes-dynamic-pvc-1a45d656-8226-11e7-a774-005056850b72
+              FSType:
+              RBDPool:		tenx-pool
+              RadosUser:		admin
+              Keyring:		/etc/ceph/keyring
+              SecretRef:		&{ceph-secret}
+              ReadOnly:		false
+          Events:			<none>
+
+        #+END_SRC
+        从 Type->RBDImage 中可看出，使用的块
+        kubernetes-dynamic-pvc-1a45d656-8226-11e7-a774-005056850b72 进行存储的。
+        准备工作完成了
+****** 更改挂在的 ceph 块大小
+       1. 在 ceph 节点上：
+        #+BEGIN_SRC sh
+         rbd resize --size 20000  kubernetes-dynamic-pvc-1a45d656-8226-11e7-a774-005056850b72
+        #+END_SRC
+       2. 找到挂在 kubernetes-dynamic-pvc-1a45d656-8226-11e7-a774-005056850b72 对
+          应的设备节点，如 kubernetes-dynamic-pvc-1a45d656-8226-11e7-a774-005056850b72
+          挂在到在 192.168.0.94 的/dev/rbd3,则需要登录到 94 上，执行一下命令进行扩容：
+
+          #+BEGIN_SRC sh
+            resize2fs /dev/rbd3
+          #+END_SRC
+****** 对 pv 进行扩容
+       通过 kubernetes API update 对应的 pv 的 spec->capacity->storage,示例：
+
+       #+BEGIN_SRC yaml
+         apiVersion: v1
+         kind: PersistentVolume
+         metadata:
+           annotations:
+             pv.kubernetes.io/bound-by-controller: "yes"
+             pv.kubernetes.io/provisioned-by: kubernetes.io/rbd
+           creationTimestamp: 2017-08-14T07:36:26Z
+           name: pvc-47aeb1b2-80c3-11e7-bd70-005056850b72
+           resourceVersion: "2616017"
+           selfLink: /api/v1/persistentvolumespvc-47aeb1b2-80c3-11e7-bd70-005056850b72
+           uid: 47c03480-80c3-11e7-bd70-005056850b72
+         spec:
+           accessModes:
+           - ReadWriteMany
+           capacity:
+             storage: 1Gi                 # 需要更新的字段
+           claimRef:
+             apiVersion: v1
+             kind: PersistentVolumeClaim
+             name: datadir-rediscluster-0
+             namespace: default
+             resourceVersion: "2594704"
+             uid: 47aeb1b2-80c3-11e7-bd70-005056850b72
+           persistentVolumeReclaimPolicy: Delete
+           rbd:
+             image: kubernetes-dynamic-pvc-47b3ea1e-80c3-11e7-a774-005056850b72
+             keyring: /etc/ceph/keyring
+             monitors:
+             - 192.168.0.68:6789
+             - 192.168.0.55:6789
+             - 192.168.0.94:6789
+             - 192.168.0.99:6789
+             pool: tenx-pool
+             secretRef:
+               name: ceph-secret
+             user: admin
+           storageClassName: tenx-rbd
+         status:
+           phase: Bound
+       #+END_SRC

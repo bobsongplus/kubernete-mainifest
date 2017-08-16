@@ -99,7 +99,6 @@ spec:
     spec:
       accessModes: [ "ReadWriteMany" ]
       storageClassName: tenx-rbd
-      persistentVolumeReclaimPolicy: Recycle
       resources:
         requests:
           storage: 512Mi
