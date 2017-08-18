@@ -97,11 +97,13 @@ spec:
   - metadata:
       name: datadir
     spec:
-      accessModes: [ "ReadWriteMany" ]
+      # accessModes: [ "ReadWriteMany" ]
+      # accessModes: [ "ReadOnlyMany" ]
+      accessModes: [ "ReadWriteOnce" ]
       storageClassName: tenx-rbd
       resources:
         requests:
-          storage: 512Mi
+          storage: 1024Mi
 ---
 apiVersion: v1
 kind: Service
@@ -110,6 +112,7 @@ metadata:
     tenxcloud.com/schemaPortname: mysqltest/TCP
     system/lbgroup: none
   name: mysqltest-pgytt
+  namespace: kube-system
   labels:
     app: mysqltest-pgytt
 spec:
@@ -127,6 +130,7 @@ metadata:
   annotations:
     service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
   name: mysqltest
+  namespace: kube-system
   labels:
     app: mysqltest
 spec:

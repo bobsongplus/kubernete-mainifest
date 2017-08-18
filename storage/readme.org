@@ -139,7 +139,9 @@
 *** 原理
     StatefulSet 由 Service 和 volumeClaimTemplates 组成。Service 中的多个 Pod 将会被分别
     编号，并挂载 volumeClaimTemplates 中声明的 PV。
-
+*** 参考阅读
+**** Kubernetes 如何支持有状态服务的部署
+ 	  http://www.cnblogs.com/Jack47/p/deploy-stateful-application-on-Kubernetes.html
 
 ** storageclass 使用到项目中
 *** kube-controller-manager 和 kubelet 的容器或主机 中需要集成 rbd 命令
@@ -170,6 +172,9 @@
     2. 在 statefluset 所在的 ns 中存在连接 ceph 的 storageclass 配置信息
     3. 在创建的 statefulset 时，通过 volumeClaimtemplates->storageClassName: xxxx，
        指定在哪个 storageclass 上自动创建 pvc 和 pv
+    4. 当 statefulSet 中的 accessModes 为 ReadWriteMany 时，每个 node 节点上只能有一个实例，
+       当为 ReadOnlyMany 时，可多个实例运行在同一个 node 节点上，当为 ReadWriteOnce 时，
+       可多个实例运行在同一个 node 节点上
 
 **** 实例演示
      1. 创建 secret key(每个命名空间一个)
@@ -223,104 +228,104 @@
         + mysqlstatefulset 示例：
 
         #+BEGIN_SRC yaml
-          apiVersion: v1
-          kind: Service
-          metadata:
-            annotations:
-              tenxcloud.com/schemaPortname: mysqltest/TCP
-              system/lbgroup: none
-            name: mysqltest-pgytt
-            labels:
-              app: mysqltest-pgytt
-          spec:
-            ports:
-              - port: 3306
-                name: mysqltest
-            selector:
-              app: mysqltest
-            externalIPs:
-              - 11.11.1.1
-          ---
-          apiVersion: v1
-          kind: Service
-          metadata:
-            annotations:
-              service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
-            name: mysqltest
-            labels:
-              app: mysqltest
-          spec:
-            ports:
-            - port: 3306
-              name: mysqltest
-            clusterIP: None
-            selector:
-              app: mysqltest
-          ---
-          apiVersion: apps/v1beta1
-          kind: StatefulSet
-          metadata:
-            name: mysqltest
-            namespace: kube-system
-          spec:
-            serviceName: mysqltest
-            replicas: 2
-            template:
-              metadata:
-                labels:
-                  app: mysqltest
-                annotations:
-                  pod.alpha.kubernetes.io/initialized: "true"
-                  pod.alpha.kubernetes.io/init-containers: '[
-                      {
-                          "name": "install",
-                          "image": "192.168.1.52/tenx_containers/galera-install:utf8",
-                          "imagePullPolicy": "Always",
-                          "args": ["--work-dir=/work-dir"],
-                          "volumeMounts": [
-                              {
-                                  "name": "workdir",
-                                  "mountPath": "/work-dir"
-                              },
-                              {
-                                  "name": "config",
-                                  "mountPath": "/etc/mysql"
+           apiVersion: v1
+           kind: Service
+           metadata:
+             annotations:
+               tenxcloud.com/schemaPortname: mysqltest/TCP
+               system/lbgroup: none
+             name: mysqltest-pgytt
+             labels:
+               app: mysqltest-pgytt
+           spec:
+             ports:
+               - port: 3306
+                 name: mysqltest
+             selector:
+               app: mysqltest
+             externalIPs:
+               - 11.11.1.1
+           ---
+           apiVersion: v1
+           kind: Service
+           metadata:
+             annotations:
+               service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
+             name: mysqltest
+             labels:
+               app: mysqltest
+           spec:
+             ports:
+             - port: 3306
+               name: mysqltest
+             clusterIP: None
+             selector:
+               app: mysqltest
+           ---
+           apiVersion: apps/v1beta1
+           kind: StatefulSet
+           metadata:
+             name: mysqltest
+             namespace: kube-system
+           spec:
+             serviceName: mysqltest
+             replicas: 2
+             template:
+               metadata:
+                 labels:
+                   app: mysqltest
+                 annotations:
+                   pod.alpha.kubernetes.io/initialized: "true"
+                   pod.alpha.kubernetes.io/init-containers: '[
+                       {
+                           "name": "install",
+                           "image": "192.168.1.52/tenx_containers/galera-install:utf8",
+                           "imagePullPolicy": "Always",
+                           "args": ["--work-dir=/work-dir"],
+                           "volumeMounts": [
+                               {
+                                   "name": "workdir",
+                                   "mountPath": "/work-dir"
+                               },
+                               {
+                                   "name": "config",
+                                   "mountPath": "/etc/mysql"
+                               }
+                           ]
+                       },
+                       {
+                           "name": "bootstrap",
+                           "image": "192.168.1.52/tenx_containers/debian:jessie",
+                           "command": ["/work-dir/peer-finder"],
+                           "args": ["-on-start=\"/work-dir/on-start.sh\"", "-service=mysqltest"],
+                           "env": [
+                             {
+                                 "name": "POD_NAMESPACE",
+                                 "valueFrom": {
+                                     "fieldRef": {
+                                         "apiVersion": "v1",
+                                         "fieldPath": "metadata.namespace"
+                                     }
+                                 }
                               }
-                          ]
-                      },
-                      {
-                          "name": "bootstrap",
-                          "image": "192.168.1.52/tenx_containers/debian:jessie",
-                          "command": ["/work-dir/peer-finder"],
-                          "args": ["-on-start=\"/work-dir/on-start.sh\"", "-service=mysqltest"],
-                          "env": [
-                            {
-                                "name": "POD_NAMESPACE",
-                                "valueFrom": {
-                                    "fieldRef": {
-                                        "apiVersion": "v1",
-                                        "fieldPath": "metadata.namespace"
-                                    }
-                                }
-                             }
-                          ],
-                          "volumeMounts": [
-                              {
-                                  "name": "workdir",
-                                  "mountPath": "/work-dir"
-                              },
-                              {
-                                  "name": "config",
-                                  "mountPath": "/etc/mysql"
-                              }
-                          ]
-                      }
-                  ]'
-              spec:
-                terminationGracePeriodSeconds: 0
-                containers:
-                - name: mysqltest
-                  image: 192.168.1.52/tenx_containers/mysql-galera:e2e
+                           ],
+                           "volumeMounts": [
+                               {
+                                   "name": "workdir",
+                                   "mountPath": "/work-dir"
+                               },
+                               {
+                                   "name": "config",
+                                   "mountPath": "/etc/mysql"
+                               }
+                           ]
+                       }
+                   ]'
+               spec:
+                 terminationGracePeriodSeconds: 0
+                 containers:
+                 - name: mysqltest
+                 image: 192.168.1.52/tenx_containers/mysql-galera:e2e
                   ports:
                   - containerPort: 3306
                     name: mysqltest
@@ -363,6 +368,66 @@
                     storage: 512Mi
         #+END_SRC
 
+**** tenxcloud statefulset 集成 storageclass
+     每个命名空间下必须有一个 ceph 的 secret，需要与 pvc 在相同的命名空间，可存在
+     多个 storageclass，
+*****  创建集群
+      1. 页面参数：副本数、存储大小、密码、是否定时备份、备份间隔时间
+      2. 检查 secret 是否存在，存在进行下一步，不存在，创建 ceph 认证 secret,
+         (secret 中的 key 是将 ceph 认证用户的 key 进行 base64 编码得到,command:
+       ceph auth get-key client.admin | base64)
+      3. 是否需要定时备份，以及备份时间间隔， 若需要定时备份，则启动 goroutine 进
+         行定时备份，默认有一个时间间隔（1 天）,定时备份机制可采用定时创建快照的
+         方式进行备份
+      4. 根据前端传递的 statefulset/service/headlessService 配置，调用 kubernetes
+         API 分别创建 statefulset/service/headlessService, 同时会自动创建 pvc 和 pv，
+         pvc 的名字命名由三部分组成为：<volumeClaimTemplates:name>-<statefulsetName>-x
+
+***** 删除集群
+      1. 删除 statefulset 信息
+      2. 检查参数是否要同时删除存储，存储是否保留, 不保留则删除 statefulset 对应的
+         pvc 即可，pv 自动删除(pvc 的名字命名规则为：
+         volumeClaimTemplatesName-statefulsetName-X, X 为数字)
+      3. 删除 headlessService 和 service 信息
+
+***** 集群扩容
+      目前 stroageclass 不支持自动扩容，需要手动完成,分两个步骤：修改 rbd images,
+      修改 pv
+      1. rbd image 扩容
+        扩容可以使用 rbd-storage-aent 流程，扩容 rbd 的 image 大小
+      2. 通过 pvc 配置信息 找到 相应的 pv，修改 pv 中 capacity->storage 域的大小,
+         pvc storage 大小会自动同步
+      3. 后台暂定 statefulSet 服务，修改 statefulSet 中 storage 大小，然后重新启
+         动 statefulSet 服务，之前的存储卷会自动匹配上，之后进行水平扩展时自动使用
+         新的 storage 大小
+      *注意 statefulSet 中的 requests->storage 无法在线修改，当需要统计磁盘使用情况时，
+      不要通过此字段进行统计，需要相应的 pvc 进行统计*
+
+***** 集群水平扩展
+      可使用 kubectl scale 或 kubectl patch 水平扩展集群,水平扩展时，新创建的
+      pvc 按照 statefulSet 中的 storage 的大小新建 pv,实例缩减时，pvc/pv 不会自动删除，
+      当缩减时，需要手动删除相应的 pvc/pv
+      1. kubectl scale 水平扩展或水平缩减都可以
+         #+BEGIN_SRC sh
+          kubectl scale  statefulsets/mysqltest -n kube-system --replicas=2
+         #+END_SRC
+      2.  kubectl patch 水平扩展或水平缩减
+         #+BEGIN_SRC sh
+           kubectl patch statefulsets/mysqltest -n kube-system  -p '{"spec":{"replicas":3}}'
+         #+END_SRC
+
+***** statefulSet 创建数据块复用
+      使用场景：statefulSet 服务删除时，保留数据块，新建服务时，想服用原来的数据
+      注意： 数据可以复用但条件比较苛刻
+       1，复用时创建数据库服务的名字要与之前一致
+       2. 命名空间要一致，
+       3. volumeClaimTemplates 中 name 名字要相同)
+
+***** TODO kubernetes resize pv 进展
+******  "Add support for resizing PVs · Issue #284 · kubernetes/features"
+ 	     https://github.com/kubernetes/features/issues/284
+****** "Allow Updating StatefulSet's entire PodTemplateSpec · Issue #41015 · kubernetes/kubernetes"
+ 	     https://github.com/kubernetes/kubernetes/issues/41015
 *** storagelcass 在 deployment 中的应用
     在 deployment 的应用一般时已经创建好了的 pvc-pv，只需要在 deployment yaml 配置
     的 volumes 域 persistentVolumeClaim->claimName 制定 pvc 名字即可使用
@@ -431,6 +496,81 @@
      #+END_SRC
      这里创建了一个名字为 task-pv-pod 的 pod，通过 persistentVolumeClaim->claimName
      指定上一步骤中创建的 pvc，即可挂在成功, 注意 namespace 必须要与 pvc 相同
+**** storageclass deployment 同一数据卷，多个实例同时进行读写操作模型
+***** 一个数据卷一个实例写，多个实例读
+      1. 创建同时具有 ReadWriteOnce、ReadOnlyMany 多个 accessMode 的 pvc，yaml 配置如：
+
+         #+BEGIN_SRC yaml
+           kind: PersistentVolumeClaim
+           apiVersion: v1
+           metadata:
+             name: task-pv-claim
+             namespace: default
+           spec:
+             accessModes:
+               - ReadWriteOnce
+               - ReadOnlyMany
+             storageClassName: tenx-rbd
+             resources:
+               requests:
+                 storage: 3Gi
+         #+END_SRC
+
+      2. 创建可读写 task-pv-claim 卷的 pod
+         *注意当挂载具有多个 accessMode 的 pod 时，readOnly 必须存在*
+         #+BEGIN_SRC yaml
+           kind: Pod
+           apiVersion: v1
+           metadata:
+             name: task-pv-pod-rw
+           spec:
+
+             volumes:
+               - name: task-pv-storage
+                 persistentVolumeClaim:
+                   claimName: task-pv-claim
+                   readOnly: false        # fase: rw, true: readOnly
+             containers:
+               - name: task-pv-container
+                 image: nginx
+                 ports:
+                   - containerPort: 80
+                     name: "http-server"
+                 volumeMounts:
+                 - mountPath: "/usr/share/nginx/html"
+                   name: task-pv-storage
+         #+END_SRC
+
+      3. 创建只可读 task-pv-claim 卷的 pod
+         *readOnly 为 true*
+         #+BEGIN_SRC yaml
+           kind: Pod
+           apiVersion: v1
+           metadata:
+             name: task-pv-pod-readonly
+           spec:
+
+             volumes:
+               - name: task-pv-storage
+                 persistentVolumeClaim:
+                   claimName: task-pv-claim
+                   readOnly: true       # fase: rw, true: readOnly
+             containers:
+               - name: task-pv-container
+                 image: nginx
+                 ports:
+                   - containerPort: 80
+                     name: "http-server"
+                 volumeMounts:
+                 - mountPath: "/usr/share/nginx/html"
+                   name: task-pv-storage
+         #+END_SRC
+
+         此时即可实现了对于一个卷，一个 pod 可读写，另一个 pod 只可读取的模型
+
+
+    
+
 **** 注意点
      只要采用了 stroageclass 的存储方式，就需要 secret，在与 pvc 和 pod 同 ns 下，要有相
      应的 secret
@@ -552,3 +692,9 @@
          status:
            phase: Bound
        #+END_SRC
+
+
+
+
+
+kubernetes-dynamic-pvc-5d47c1e6-8255-11e7-a774-005056850b72
