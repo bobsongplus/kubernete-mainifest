@@ -1,29 +1,3 @@
-** ceph
-*** 常用命令
-   1. ceph 运维常用指令
-  	   - http://zhanguo1110.blog.51cto.com/5750817/1543032
-      - http://linuxnote.blog.51cto.com/9876511/1788361
-*** 集群
-    1. 启动 mon 进程 service ceph start  mon.node1
-    2. 启动 msd 进程 service ceph start mds.node1
-    3. 启动 osd 进程 service ceph start osd.0
-    4. 查看机器的监控状态 ceph health
-    5. 查看 ceph 的实时运行状态: ceph -w
-    6. 检查信息状态信息: ceph -s
-    7. 查看 ceph 存储空间 ceph df
-    8. 删除一个节点的所有的 ceph 数据包: ceph-deploy purge node1
-    9. 为 ceph 创建一个 admin 用户并为 admin 用户创建一个密钥，把密钥保存到/etc/ceph 目
-       录下：ceph auth get-or-create client.admin mds 'allow' osd 'allow *' mon
-       'allow *' > /etc/ceph/ceph.client.admin.keyring 或 ceph auth get-or-create client.admin mds 'allow' osd 'allow *' mon 'allow *' -o /etc/ceph/ceph.client.admin.keyring
-    10. 为 osd.0 创建一个用户并创建一个 key: ceph auth get-or-create osd.0 mon 'allow rwx' osd 'allow *' -o /var/lib/ceph/osd/ceph-0/keyring
-    11. 为 mds.node1 创建一个用户并创建一个 key: ceph auth get-or-create mds.node1 mon 'allow rwx' osd 'allow *' mds 'allow *' -o /var/lib/ceph/mds/ceph-node1/keyring
-    12. 查看 ceph 集群中的认证用户及相关的 key: ceph auth list
-    13. 删除集群中的一个认证用户: ceph auth del osd.0
-    14. 查看集群的详细配置: ceph daemon mon.node1 config show | more
-    15. 查看集群健康状态细节: ceph health detail
-    16. 查看 ceph log 日志所在的目录:  ceph-conf --name mon.node1 --show-config-value log_file ceph-conf --name mon.node1 --show-config-value log_file
-    17.
-
 ** PV & PVC
 *** 介绍
     PersistentVolume（pv）和 PersistentVolumeClaim（pvc）是 k8s 提供的两种 API
@@ -172,10 +146,6 @@
 ** rbd question
 *** Error creating rbd image: executable file not found in $PATH · Issue #38923 · kubernetes/kubernetes
  	  https://github.com/kubernetes/kubernetes/issues/38923
-*** rbd 在线扩容
- 	  https://my.oschina.net/oscfox/blog/312220
-*** ceph-rbd 常用命令
- 	  https://ztjlovejava.github.io/2015/03/29/Ceph-rbd-cmd/
 ** statefulset
 *** pvc will not delete when statefulset be deleted
     Deleting and/or scaling a StatefulSet down will not delete the volumes
@@ -285,146 +255,146 @@
          #+END_SRC
         + mysqlstatefulset 示例：
 
-        #+BEGIN_SRC yaml
-           apiVersion: v1
-           kind: Service
-           metadata:
-             annotations:
-               tenxcloud.com/schemaPortname: mysqltest/TCP
-               system/lbgroup: none
-             name: mysqltest-pgytt
-             labels:
-               app: mysqltest-pgytt
-           spec:
-             ports:
+          #+BEGIN_SRC yaml
+             apiVersion: v1
+             kind: Service
+             metadata:
+               annotations:
+                 tenxcloud.com/schemaPortname: mysqltest/TCP
+                 system/lbgroup: none
+               name: mysqltest-pgytt
+               labels:
+                 app: mysqltest-pgytt
+             spec:
+               ports:
+                 - port: 3306
+                   name: mysqltest
+               selector:
+                 app: mysqltest
+               externalIPs:
+                 - 11.11.1.1
+             ---
+             apiVersion: v1
+             kind: Service
+             metadata:
+               annotations:
+                 service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
+               name: mysqltest
+               labels:
+                 app: mysqltest
+             spec:
+               ports:
                - port: 3306
                  name: mysqltest
-             selector:
-               app: mysqltest
-             externalIPs:
-               - 11.11.1.1
-           ---
-           apiVersion: v1
-           kind: Service
-           metadata:
-             annotations:
-               service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
-             name: mysqltest
-             labels:
-               app: mysqltest
-           spec:
-             ports:
-             - port: 3306
+               clusterIP: None
+               selector:
+                 app: mysqltest
+             ---
+             apiVersion: apps/v1beta1
+             kind: StatefulSet
+             metadata:
                name: mysqltest
-             clusterIP: None
-             selector:
-               app: mysqltest
-           ---
-           apiVersion: apps/v1beta1
-           kind: StatefulSet
-           metadata:
-             name: mysqltest
-             namespace: kube-system
-           spec:
-             serviceName: mysqltest
-             replicas: 2
-             template:
-               metadata:
-                 labels:
-                   app: mysqltest
-                 annotations:
-                   pod.alpha.kubernetes.io/initialized: "true"
-                   pod.alpha.kubernetes.io/init-containers: '[
-                       {
-                           "name": "install",
-                           "image": "192.168.1.52/tenx_containers/galera-install:utf8",
-                           "imagePullPolicy": "Always",
-                           "args": ["--work-dir=/work-dir"],
-                           "volumeMounts": [
-                               {
-                                   "name": "workdir",
-                                   "mountPath": "/work-dir"
-                               },
-                               {
-                                   "name": "config",
-                                   "mountPath": "/etc/mysql"
-                               }
-                           ]
-                       },
-                       {
-                           "name": "bootstrap",
-                           "image": "192.168.1.52/tenx_containers/debian:jessie",
-                           "command": ["/work-dir/peer-finder"],
-                           "args": ["-on-start=\"/work-dir/on-start.sh\"", "-service=mysqltest"],
-                           "env": [
-                             {
-                                 "name": "POD_NAMESPACE",
-                                 "valueFrom": {
-                                     "fieldRef": {
-                                         "apiVersion": "v1",
-                                         "fieldPath": "metadata.namespace"
-                                     }
+               namespace: kube-system
+             spec:
+               serviceName: mysqltest
+               replicas: 2
+               template:
+                 metadata:
+                   labels:
+                     app: mysqltest
+                   annotations:
+                     pod.alpha.kubernetes.io/initialized: "true"
+                     pod.alpha.kubernetes.io/init-containers: '[
+                         {
+                             "name": "install",
+                             "image": "192.168.1.52/tenx_containers/galera-install:utf8",
+                             "imagePullPolicy": "Always",
+                             "args": ["--work-dir=/work-dir"],
+                             "volumeMounts": [
+                                 {
+                                     "name": "workdir",
+                                     "mountPath": "/work-dir"
+                                 },
+                                 {
+                                     "name": "config",
+                                     "mountPath": "/etc/mysql"
                                  }
-                              }
-                           ],
-                           "volumeMounts": [
+                             ]
+                         },
+                         {
+                             "name": "bootstrap",
+                             "image": "192.168.1.52/tenx_containers/debian:jessie",
+                             "command": ["/work-dir/peer-finder"],
+                             "args": ["-on-start=\"/work-dir/on-start.sh\"", "-service=mysqltest"],
+                             "env": [
                                {
-                                   "name": "workdir",
-                                   "mountPath": "/work-dir"
-                               },
-                               {
-                                   "name": "config",
-                                   "mountPath": "/etc/mysql"
-                               }
-                           ]
-                       }
-                   ]'
-               spec:
-                 terminationGracePeriodSeconds: 0
-                 containers:
-                 - name: mysqltest
-                 image: 192.168.1.52/tenx_containers/mysql-galera:e2e
-                  ports:
-                  - containerPort: 3306
-                    name: mysqltest
-                  - containerPort: 4444
-                    name: sst
-                  - containerPort: 4567
-                    name: replication
-                  - containerPort: 4568
-                    name: ist
-                  env:
-                  - name: MYSQL_ROOT_PASSWORD
-                    value: "123123"
-                  resources:
-                    limits:
-                      memory: '512Mi'
-                    requests:
-                      cpu: 50m
-                      memory: '512Mi'
-                  args:
-                  - --defaults-file=/etc/mysql/my-galera.cnf
-                  - --user=root
-                  volumeMounts:
-                  - name: datadir
-                    mountPath: /var/lib/
+                                   "name": "POD_NAMESPACE",
+                                   "valueFrom": {
+                                       "fieldRef": {
+                                           "apiVersion": "v1",
+                                           "fieldPath": "metadata.namespace"
+                                       }
+                                   }
+                                }
+                             ],
+                             "volumeMounts": [
+                                 {
+                                     "name": "workdir",
+                                     "mountPath": "/work-dir"
+                                 },
+                                 {
+                                     "name": "config",
+                                     "mountPath": "/etc/mysql"
+                                 }
+                             ]
+                         }
+                     ]'
+                 spec:
+                   terminationGracePeriodSeconds: 0
+                   containers:
+                   - name: mysqltest
+                   image: 192.168.1.52/tenx_containers/mysql-galera:e2e
+                    ports:
+                    - containerPort: 3306
+                      name: mysqltest
+                    - containerPort: 4444
+                      name: sst
+                    - containerPort: 4567
+                      name: replication
+                    - containerPort: 4568
+                      name: ist
+                    env:
+                    - name: MYSQL_ROOT_PASSWORD
+                      value: "123123"
+                    resources:
+                      limits:
+                        memory: '512Mi'
+                      requests:
+                        cpu: 50m
+                        memory: '512Mi'
+                    args:
+                    - --defaults-file=/etc/mysql/my-galera.cnf
+                    - --user=root
+                    volumeMounts:
+                    - name: datadir
+                      mountPath: /var/lib/
+                    - name: config
+                      mountPath: /etc/mysql
+                  volumes:
                   - name: config
-                    mountPath: /etc/mysql
-                volumes:
-                - name: config
-                  emptyDir: {}
-                - name: workdir
-                  emptyDir: {}
-            volumeClaimTemplates:
-            - metadata:
-                name: datadir
-              spec:
-                accessModes: [ "ReadWriteMany" ]
-                storageClassName: tenx-rbd
-                resources:
-                  requests:
-                    storage: 512Mi
-        #+END_SRC
+                    emptyDir: {}
+                  - name: workdir
+                    emptyDir: {}
+              volumeClaimTemplates:
+              - metadata:
+                  name: datadir
+                spec:
+                  accessModes: [ "ReadWriteMany" ]
+                  storageClassName: tenx-rbd
+                  resources:
+                    requests:
+                      storage: 512Mi
+          #+END_SRC
 
 **** tenxcloud statefulset 集成 storageclass
      每个命名空间下必须有一个 ceph 的 secret，需要与 pvc 在相同的命名空间，可存在
@@ -481,11 +451,6 @@
        2. 命名空间要一致，
        3. volumeClaimTemplates 中 name 名字要相同)
 
-***** TODO kubernetes resize pv 进展
-******  "Add support for resizing PVs · Issue #284 · kubernetes/features"
- 	     https://github.com/kubernetes/features/issues/284
-****** "Allow Updating StatefulSet's entire PodTemplateSpec · Issue #41015 · kubernetes/kubernetes"
- 	     https://github.com/kubernetes/kubernetes/issues/41015
 *** storagelcass 在 deployment 中的应用
     在 deployment 的应用一般时已经创建好了的 pvc-pv，只需要在 deployment yaml 配置
     的 volumes 域 persistentVolumeClaim->claimName 制定 pvc 名字即可使用
@@ -754,3 +719,9 @@
 *** FAQ
 **** "AdminSocketConfigObs::init: failed: rbd-clients · Issue #278 · ceph/ceph-ansible"
  	   https://github.com/ceph/ceph-ansible/issues/278
+
+**** kubernetes resize pv 进展
+******  "Add support for resizing PVs · Issue #284 · kubernetes/features"
+ 	     https://github.com/kubernetes/features/issues/284
+****** "Allow Updating StatefulSet's entire PodTemplateSpec · Issue #41015 · kubernetes/kubernetes"
+ 	     https://github.com/kubernetes/kubernetes/issues/41015
