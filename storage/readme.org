@@ -396,7 +396,7 @@
                       storage: 512Mi
           #+END_SRC
 
-**** tenxcloud statefulset 集成 storageclass
+**** statefulset 集成 storageclass
      每个命名空间下必须有一个 ceph 的 secret，需要与 pvc 在相同的命名空间，可存在
      多个 storageclass，
 *****  创建集群
