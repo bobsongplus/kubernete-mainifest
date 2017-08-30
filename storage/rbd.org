@@ -36,3 +36,8 @@
 
 **** rbd 在线扩容
  	  https://my.oschina.net/oscfox/blog/312220
+**** ceph backup
+***** "How to Backup Ceph Block Storage
+ 	    https://nicksabine.com/post/ceph-backup/
+***** "10. 查看使用 RBD 镜像的客户端 · Ceph 运维手册"
+ 	    https://lihaijing.gitbooks.io/ceph-handbook/content/Advance_usage/list_rbd_watcher.html

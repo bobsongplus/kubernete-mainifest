@@ -1,0 +1,77 @@
+* 基于 storageclass 挂在外部 nfs 服务 volume
+
+** 准备工作
+
+*** nfs 服务以及客户端
+   安装 nfs 服务，centos 下服务端安装方式，同时 k8s 中每个 node 上需要安装 nfs client，
+   安装方式时相同的命令
+   #+BEGIN_SRC sh
+     yum install nfs-utils
+   #+END_SRC
+**** 修改 nfs 服务的挂载点
+     在 /etc/exports 中添加两个挂在点
+     #+BEGIN_SRC sh
+       /home           *(rw,sync,no_root_squash,no_subtree_check)
+       /var/nfs        *(rw,sync,no_subtree_check,no_root_squash)
+     #+END_SRC
+     *通过在 nfs server 设备上执行 exportfs -a  生效*
+**** 扩展阅读
+***** "Setting Up an NFS Server and Client on CentOS 7.2"
+ 	  https://www.howtoforge.com/tutorial/setting-up-an-nfs-server-and-client-on-centos-7/
+
+*** 镜像
+    官方例子是从 quay.io 获取，由于国内网络问题，可以使用阿里的镜像：
+    registry.cn-hangzhou.aliyuncs.com/wise2c/nfs-client-provisioner:devel，但我
+    测试的结果是有问题，解决方式是在此基础上，通过自己编译 nfs-cient-provisioner
+    将其覆盖掉
+** 部署
+*** 部署 nfs-client-provisioner deployment
+
+    #+BEGIN_SRC yaml
+      kind: Deployment
+      apiVersion: extensions/v1beta1
+      metadata:
+        name: nfs-client-provisioner
+      spec:
+        replicas: 1
+        strategy:
+          type: Recreate
+        template:
+          metadata:
+            labels:
+              app: nfs-client-provisioner
+          spec:
+            containers:
+              - name: nfs-client-provisioner
+                image: 192.168.1.55/tenx_containers/nfs-client-provisioner:latest # 更换自
+                                    # 己的镜像
+                volumeMounts:
+                  - name: nfs-client-root
+                    mountPath: /persistentvolumes
+                env:
+                  - name: PROVISIONER_NAME
+                    value: fuseim.pri/ifs
+                  - name: NFS_SERVER
+                    value: 10.10.10.60          # 更换 nfs 服务 ip
+                  - name: NFS_PATH
+                    value: /ifs/kubernetes      # 跟花 nfs 服务挂在路径
+            volumes:
+              - name: nfs-client-root
+                nfs:
+                  server: 10.10.10.60           # 更换 fns 服务 ip
+                  path: /ifs/kubernetes         # 更换 nfs 挂在路径
+    #+END_SRC
+
+** 扩展阅读
+*** nfs-client 与 nfs 的区别
+    1. nfs-cilent 它通过 K8S 的内置的 NFS 驱动挂载远端的 NFS 服务器到
+    本地目录；然后将自身作为 storage provider，关联 storage class。当用户创建对应
+    的 PVC 来申请 PV 时，该 provider 就将 PVC 的要求与自身的属性比较，一旦满足就在本地挂
+    载好的 NFS 目录中创建 PV 所属的子目录，为 Pod 提供动态的存储服务。
+
+    2. nfs 与 nfs-client 不同，该驱动并不使用 k8s 的 NFS 驱动来挂载远端的 NFS 到本地再分配，而是直
+  接将本地文件映射到容器内部，然后在容器内使用 ganesha.nfsd 来对外提供 NFS 服务；在每
+  次创建 PV 的时候，直接在本地的 NFS 根目录中创建对应文件夹，并 export 出该子目录。
+*** 基于 storageclass nfs 部署
+**** [k8s]k8s-ceph-statefulsets-storageclass-nfs 有状态应用布署实践
+ 	   http://www.cnblogs.com/iiiiher/p/7159810.html

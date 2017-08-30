@@ -1,0 +1,21 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: test-pod
+spec:
+  containers:
+  - name: test-pod
+    image: 192.168.1.52/tenx_containers/busybox:latest
+    command:
+      - "/bin/sh"
+    args:
+      - "-c"
+      - "touch /mnt/SUCCESS && exit 0 || exit 1"
+    volumeMounts:
+      - name: nfs-pvc
+        mountPath: "/mnt"
+  restartPolicy: "Never"
+  volumes:
+    - name: nfs-pvc
+      persistentVolumeClaim:
+        claimName: test-claim

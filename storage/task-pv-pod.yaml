@@ -2,13 +2,14 @@ kind: Pod
 apiVersion: v1
 metadata:
   name: task-pv-pod-rw
+  namespace: song1
 spec:
 
   volumes:
     - name: task-pv-storage
       persistentVolumeClaim:
         claimName: task-pv-claim
-        readOnly: false        # fase: rw, true: readOnly
+        readOnly: true        # fase: rw, true: readOnly
   containers:
     - name: task-pv-container
       image: nginx

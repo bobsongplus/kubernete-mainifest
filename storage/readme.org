@@ -115,23 +115,6 @@
                name: task-pv-storage
 
      #+END_SRC
-*** 参考
-**** "Persistent Volumes - Kubernetes"
-       https://kubernetes.io/docs/concepts/storage/persistent-volumes/#class
-**** pv 介绍 http://www.jianshu.com/p/fda9de00ba5f
-**** class
-     A PV can have a class, which is specified by setting the storageClassName
-     attribute to the name of a StorageClass. A PV of a particular class can
-     only be bound to PVCs requesting that class. A PV with no storageClassName
-     has no class and can only be bound to PVCs that request no particular
-     class.
-**** mount options
-     You can specify a mount option by using the annotation:
-       volume.beta.kubernetes.io/mount-options, A mount option is a string which
-       will be cumulatively joined and used while mounting volume to the
-       disk.Note that not all Persistent volume types support mount
-       options.see:https://kubernetes.io/docs/concepts/storage/persistent-volumes/#mountoptions
-
 *** updateSize
     + pvc cannot update requests->storage
     + pv can update capacity->storage, and automatic update pvc size
@@ -716,12 +699,40 @@
            phase: Bound
        #+END_SRC
 
-*** FAQ
+** FAQ
+*** 参考
+**** "Persistent Volumes - Kubernetes"
+       https://kubernetes.io/docs/concepts/storage/persistent-volumes/#class
+**** pv 介绍 http://www.jianshu.com/p/fda9de00ba5f
+**** class
+     A PV can have a class, which is specified by setting the storageClassName
+     attribute to the name of a StorageClass. A PV of a particular class can
+     only be bound to PVCs requesting that class. A PV with no storageClassName
+     has no class and can only be bound to PVCs that request no particular
+     class.
+**** mount options
+     You can specify a mount option by using the annotation:
+       volume.beta.kubernetes.io/mount-options, A mount option is a string which
+       will be cumulatively joined and used while mounting volume to the
+       disk.Note that not all Persistent volume types support mount
+       options.see:https://kubernetes.io/docs/concepts/storage/persistent-volumes/#mountoptions
+
 **** "AdminSocketConfigObs::init: failed: rbd-clients · Issue #278 · ceph/ceph-ansible"
  	   https://github.com/ceph/ceph-ansible/issues/278
 
-**** kubernetes resize pv 进展
-******  "Add support for resizing PVs · Issue #284 · kubernetes/features"
+**** "ceph/go-ceph: Go bindings for RADOS, RBD, and CephFS"
+ 	   https://github.com/ceph/go-ceph
+*** kubernetes resize pv 进展
+****** Add support for resizing PVs · Issue #284 · kubernetes/features
  	     https://github.com/kubernetes/features/issues/284
-****** "Allow Updating StatefulSet's entire PodTemplateSpec · Issue #41015 · kubernetes/kubernetes"
- 	     https://github.com/kubernetes/kubernetes/issues/41015
+****** Allow Updating StatefulSet's entire PodTemplateSpec · Issue #41015 · kubernetes/kubernetes
+ 	     htps://github.com/kubernetes/kubernetes/issues/41015
+****** Support \"fstype\" parameter in dynamically provisioned PVs by codablock · Pull Request #45345 · kubernetes/kubernetes
+ 	     htps://github.com/kubernetes/kubernetes/pull/45345/files
+****** community/volume-provisioning.md at master · kubernetes/community
+ 	     https://github.com/kubernetes/community/blob/master/contributors/design-proposals/volume-provisioning.md
+****** "Do not release resource(image) when using rbd storageclass. · Issue #45067 · kubernetes/kubernetes"
+       *If you delete a PV directly, it won't trigger PV controller to unbind the PV from the PVC and storage backend to remove the image. You need to delete the PVC to delete the rbd image.*
+ 	     https://github.com/kubernetes/kubernetes/issues/45067
+****** "[StatefulSet] Fail to scale pod when there is a blocking pod · Issue #36333 · kubernetes/kubernetes"
+ 	     https://github.com/kubernetes/kubernetes/issues/36333
