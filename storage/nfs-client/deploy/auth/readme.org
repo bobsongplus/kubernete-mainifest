@@ -1,0 +1,5 @@
+* rbac 相关
+** 执行命令顺序
+   #+BEGIN_SRC emacs-lisp
+     kubectl create -f serviceaccount.yaml -f clusterrole.yaml -f clusterrolebinding.yaml
+   #+END_SRC

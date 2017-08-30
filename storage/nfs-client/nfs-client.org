@@ -1,0 +1,182 @@
+* 基于 storageclass 挂在外部 nfs 服务 volume
+  nfs provisioner  需要通过 nfs-client 驱动坐一个 deployment 部署在 k8s 集群中，然后对
+  外提供存储服务
+** 系统信息
+*** k8s 版本
+
+    #+BEGIN_SRC sh
+      [root@root ~]# kubectl version
+      Client Version: version.Info{Major:"1", Minor:"6", GitVersion:"v1.6.4", GitCommit:"d6f433224538d4f9ca2f7ae19b252e6fcb66a3ae", GitTreeState:"clean", BuildDate:"2017-05-19T18:44:27Z", GoVersion:"go1.7.5", Compiler:"gc", Platform:"linux/amd64"}
+      Server Version: version.Info{Major:"1", Minor:"6", GitVersion:"v1.6.4", GitCommit:"d6f433224538d4f9ca2f7ae19b252e6fcb66a3ae", GitTreeState:"clean", BuildDate:"2017-05-19T18:33:17Z", GoVersion:"go1.7.5", Compiler:"gc", Platform:"linux/amd64"}
+    #+END_SRC
+*** 系统版本
+
+    #+BEGIN_SRC sh
+      [root@master ~]# uname -a
+      Linux -master 3.10.0-514.el7.x86_64 #1 SMP Tue Nov 22 16:42:41 UTC 2016 x86_64 x86_64 x86_64 GNU/Linux
+    #+END_SRC
+
+** 准备工作
+
+*** nfs server 端及客户端
+**** server 端
+   安装 nfs 服务，centos 下服务端安装方式
+   安装方式时相同的命令
+   #+BEGIN_SRC sh
+     yum install nfs-utils
+   #+END_SRC
+***** 修改 nfs 服务的挂载点
+      在 /etc/exports 中添加两个挂在点
+      #+BEGIN_SRC sh
+        /home           *(rw,sync,no_root_squash,no_subtree_check)
+        /var/nfs        *(rw,sync,no_subtree_check,no_root_squash)
+      #+END_SRC
+      *通过在 nfs server 设备上执行 exportfs -a  生效*
+******  nfs 权限部分说明
+       + rw 表示读/写
+       + ro 表示只读
+       + sync 表示数据同步写入内存缓冲区与磁盘中，效率较低，但可以保证数据的一致性（适合于小文件传输）
+       + async 表示数据先暂时放于内存，而非直接写入硬盘，等到必要时才写入磁盘（适合于大文件传输）
+       + no_root_squash 表示 root 用户对这个共享的目录拥有至高的控制权（不安全，不建议使用）
+       + root_squash 表示 root 用户对这个共享的目录的权限和普通用户一样。
+       + all_squash 表示不管使用 NFS 的用户是谁，其身份都会被限定成一个指定的普通用户。
+       + no_all_squash 表示所有的普通用户使用 nfs 都不使用权限压缩（默认设置）
+       + anonuid/anongid 要和 root_squash 以及 all_squash 选项一同使用，用于指定使用 NFS 的用户被限 nfs 服务配置权限列表
+
+**** client 端
+     *k8s 中每个 node 上需要安装 nfs client*,安装方式时相同的命令
+     #+BEGIN_SRC sh
+       yum install nfs-utils
+     #+END_SRC
+**** nfsserver 命令
+
+     #+BEGIN_SRC sh
+       systemctl enable nfs-server.service
+       systemctl start nfs-server.service
+       systemctl stop nfs-server.service
+     #+END_SRC
+
+
+***** 扩展阅读
+****** Setting Up an NFS Server and Client on CentOS 7.2
+ 	   https://www.howtoforge.com/tutorial/setting-up-an-nfs-server-and-client-on-centos-7/
+
+*** 镜像
+    官方例子是从 quay.io 获取，由于国内网络问题，可以使用阿里的镜像：
+    registry.cn-hangzhou.aliyuncs.com/wise2c/nfs-client-provisioner:devel，但我
+    测试的结果是有问题，解决方式是在此基础上，通过自己编译 nfs-cient-provisioner
+    将其覆盖掉
+*** RBAC 认证设置(若未设置 RBAC 认证，可省略此步骤)
+    由于当前版本使用的 k8s v1.6.4，并开启了 RBAC 认证（[[https://kubernetes.io/docs/admin/authorization/rbac/][RBAC 认证文档]]），且
+    nfs-client-provisioner 是单独一个服务，会定期获取 k8s 的相关信息，所以这里需
+    要将单独为 nfs-client-provisioner 开启认证,RBAC 的配置见[[file:deploy/auth/readme.org][rbac 配置]]
+
+** 部署
+*** 部署 provisioner-deployment
+     *注意：每个 nfs-server 需要一个 provisioner-deployment*
+    #+BEGIN_SRC yaml
+      kind: Deployment
+      apiVersion: extensions/v1beta1
+      metadata:
+        name: nfs-client-provisioner
+        namespace: kube-system
+      spec:
+        replicas: 1
+        strategy:
+          type: Recreate
+        template:
+          metadata:
+            labels:
+              app: nfs-client-provisioner
+          spec:
+            serviceAccount: nfs-provisioner
+            containers:
+              - name: nfs-client-provisioner               # nfs 服务名称
+                image: 192.168.1.55/tenx_containers/nfs-client-provisioner:latest
+                volumeMounts:                        #需要，创建的 pod 或 deployment 需要
+                  - name: nfs-client-root
+                    mountPath: /persistentvolumes    # 会在此路径下存放一份挂在数据
+                env:
+                  - name: PROVISIONER_NAME
+                    value: fuseim.pri/ifs       # provisioner 属性由环境变量 PROVISIONER_NAME 提供
+                  - name: NFS_SERVER
+                    value: 192.168.0.227      #NFS servier IP 地址
+                  - name: NFS_PATH
+                    value: /var/nfs          # NFS 挂在路径
+            volumes:
+              - name: nfs-client-root
+                nfs:
+                  server: 192.168.0.227      #NFS servier IP 地址
+                  path: /var/nfs             # NFS 挂在路径
+    #+END_SRC
+*** 部署 storageclass
+    *注意：每个 nfs-server 对应一个 storageclass*
+    #+BEGIN_SRC yaml
+      apiVersion: storage.k8s.io/v1beta1
+      kind: StorageClass
+      metadata:
+        name: managed-nfs-storage
+      provisioner: fuseim.pri/ifs # or choose another name, must match deployment's env PROVISIONER_NAME'
+    #+END_SRC
+*** 部署 PVC 生成 PV
+
+    #+BEGIN_SRC yaml
+      kind: PersistentVolumeClaim
+      apiVersion: v1
+      metadata:
+        name: test-claim     #名字可由用户填写
+      spec:
+        accessModes:
+          - ReadWriteMany    # 权限可由用户填写
+        storageClassName: managed-nfs-storage  # 这里可以用于选择 nfs-server 服务名称
+        resources:
+          requests:
+            storage: 1Mi
+
+    #+END_SRC
+
+*** 部署 application Deployment 或者 Pod
+
+    #+BEGIN_SRC yaml
+      kind: Pod
+      apiVersion: v1
+      metadata:
+        name: test-pod-1
+      spec:
+        containers:
+        - name: test-pod
+          image: 192.168.1.52/tenx_containers/busybox:latest
+          command:
+            - "/bin/sh"
+          args:
+            - "-c"
+            - "touch /mnt/SUCCESS && exit 0 || exit 1"
+          volumeMounts:
+            - name: nfs-pvc
+              mountPath: "/mnt"
+        restartPolicy: "Never"
+        volumes:
+          - name: nfs-pvc
+            persistentVolumeClaim:
+              claimName: test-claim       # pvcName
+    #+END_SRC
+
+
+*** 注意点
+    1. 修改 provisioner-deployment 中 NFS 地址或路径，是无效操作，已创建的 PV 中的地址不会随之变化，
+       假如在当前 NFS 服务 下创建了 PVC/PV，需要将 PV 以及服务删除掉，才能修改。
+    2. 每个 NFS-Server 需要一个 provision-deployment 和 storageclass
+
+** 扩展阅读
+*** nfs-client 与 nfs 的区别
+    1. nfs-cilent 它通过 K8S 的内置的 NFS 驱动挂载远端的 NFS 服务器到
+    本地目录；然后将自身作为 storage provider，关联 storage class。当用户创建对应
+    的 PVC 来申请 PV 时，该 provider 就将 PVC 的要求与自身的属性比较，一旦满足就在本地挂
+    载好的 NFS 目录中创建 PV 所属的子目录，为 Pod 提供动态的存储服务。
+
+    2. nfs 与 nfs-client 不同，该驱动并不使用 k8s 的 NFS 驱动来挂载远端的 NFS 到本地再分配，而是直
+  接将本地文件映射到容器内部，然后在容器内使用 ganesha.nfsd 来对外提供 NFS 服务；在每
+  次创建 PV 的时候，直接在本地的 NFS 根目录中创建对应文件夹，并 export 出该子目录。
+*** 基于 storageclass nfs 部署
+**** [k8s]k8s-ceph-statefulsets-storageclass-nfs 有状态应用布署实践
+ 	   http://www.cnblogs.com/iiiiher/p/7159810.html
