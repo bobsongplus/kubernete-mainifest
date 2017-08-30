@@ -180,3 +180,5 @@
 *** 基于 storageclass nfs 部署
 **** [k8s]k8s-ceph-statefulsets-storageclass-nfs 有状态应用布署实践
  	   http://www.cnblogs.com/iiiiher/p/7159810.html
+**** "Sharing an NFS PV across two PVCs - Persistent Storage Examples | Installation and Configuration | OpenShift Enterprise 3.2"
+ 	   https://docs.openshift.com/enterprise/3.2/install_config/storage_examples/shared_storage.html
