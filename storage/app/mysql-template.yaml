@@ -1,0 +1,136 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    tenxcloud.com/schemaPortname: {{name}}/TCP
+  name: {{external-name}}
+  labels:
+    app: {{external-name}}
+spec:
+  ports:
+  - port: 3306
+    name: {{name}}
+  selector:
+    app: {{name}}
+  externalIPs:
+    - {{external-ip}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
+  name: {{name}}
+  labels:
+    app: {{name}}
+spec:
+  ports:
+  - port: 3306
+    name: {{name}}
+  clusterIP: None
+  selector:
+    app: {{name}}
+---
+apiVersion: apps/v1beta1
+kind: StatefulSet
+metadata:
+  name: {{name}}
+spec:
+  serviceName: {{name}}
+  replicas: {{replicas}}
+  template:
+    metadata:
+      labels:
+        app: {{name}}
+      annotations:
+        pod.alpha.kubernetes.io/initialized: "true"
+        pod.alpha.kubernetes.io/init-containers: '[
+            {
+                "name": "install",
+                "image": "{{registry}}/tenx_containers/galera-install:utf8",
+                "imagePullPolicy": "Always",
+                "args": ["--work-dir=/work-dir"],
+                "volumeMounts": [
+                    {
+                        "name": "workdir",
+                        "mountPath": "/work-dir"
+                    },
+                    {
+                        "name": "config",
+                        "mountPath": "/etc/mysql"
+                    }
+                ]
+            },
+            {
+                "name": "bootstrap",
+                "image": "{{registry}}/tenx_containers/debian:jessie",
+                "command": ["/work-dir/peer-finder"],
+                "args": ["-on-start=\"/work-dir/on-start.sh\"", "-service={{name}}"],
+                "env": [
+                  {
+                      "name": "POD_NAMESPACE",
+                      "valueFrom": {
+                          "fieldRef": {
+                              "apiVersion": "v1",
+                              "fieldPath": "metadata.namespace"
+                          }
+                      }
+                   }
+                ],
+                "volumeMounts": [
+                    {
+                        "name": "workdir",
+                        "mountPath": "/work-dir"
+                    },
+                    {
+                        "name": "config",
+                        "mountPath": "/etc/mysql"
+                    }
+                ]
+            }
+        ]'
+    spec:
+      terminationGracePeriodSeconds: 0
+      containers:
+      - name: {{name}}
+        image: {{registry}}/tenx_containers/mysql-galera:e2e
+        ports:
+        - containerPort: 3306
+          name: {{name}}
+        - containerPort: 4444
+          name: sst
+        - containerPort: 4567
+          name: replication
+        - containerPort: 4568
+          name: ist
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: "{{password}}"
+        resources:
+          limits:
+            memory: '512Mi'
+          requests:
+            cpu: 50m
+            memory: '512Mi'
+        args:
+        - --defaults-file=/etc/mysql/my-galera.cnf
+        - --user=root
+        volumeMounts:
+        - name: datadir
+          mountPath: /var/lib/
+        - name: config
+          mountPath: /etc/mysql
+      volumes:
+      - name: config
+        emptyDir: {}
+      - name: workdir
+        emptyDir: {}
+  volumeClaimTemplates:
+  - metadata:
+      name: datadir
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: tenx-rbd
+      resources:
+        requests:
+          storage: {{size}}Mi

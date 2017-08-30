@@ -1,0 +1,160 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    tenxcloud.com/schemaPortname: {{name}}/TCP
+  name: {{external-name}}
+  labels:
+    app: {{external-name}}
+spec:
+  ports:
+  - port: 2181
+    name: {{name}}
+  selector:
+    app: {{name}}
+  externalIPs:
+    - {{external-ip}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
+  name: {{name}}
+  labels:
+    app: {{name}}
+spec:
+  ports:
+  - port: 2888
+    name: peer
+  - port: 3888
+    name: leader-election
+  - port: 2181
+    name: {{name}}
+  clusterIP: None
+  selector:
+    app: {{name}}
+---
+apiVersion: apps/v1beta1
+kind: StatefulSet
+metadata:
+  name: {{name}}
+spec:
+  serviceName: {{name}}
+  replicas: {{replicas}}
+  template:
+    metadata:
+      labels:
+        app: {{name}}
+      annotations:
+        pod.alpha.kubernetes.io/initialized: "true"
+        pod.alpha.kubernetes.io/init-containers: '[
+          {
+            "name": "{{name}}-initializer",
+            "image": "{{registry}}/tenx_containers/zkinit:3.5.3-beta",
+            "env": [
+              {
+                "name": "SUPER_PASSWORD",
+                "value": "{{password}}"
+              },
+              {
+                "name": "POD_NAMESPACE",
+                "valueFrom": {
+                  "fieldRef": {
+                    "apiVersion": "v1",
+                    "fieldPath": "metadata.namespace"
+                  }
+                }
+              },
+              {
+                "name": "SERVICE_NAME",
+                "value": "{{name}}"
+              },
+              {
+                "name": "ZK_SERVER_HEAP",
+                "value": "512"
+              },
+              { "name": "ZK_CLIENT_HEAP",
+                "value": "128"
+              }
+            ],
+            "volumeMounts": [
+              {
+                "name": "package",
+                "mountPath": "/zookeeper"
+              },
+              {
+                "name": "datadir",
+                "mountPath": "/var/lib/zookeeper"
+              }
+            ]
+          }
+        ]'
+    spec:
+      containers:
+      - name: {{name}}
+        image: {{registry}}/tenx_containers/zkpet:3.5.3-beta
+        env:
+        - name: SUPER_PASSWORD
+          value: {{password}}
+        - name: ZK_SERVER_HEAP
+          value: 512
+        - name: ZK_CLIENT_HEAP
+          value: 128
+        ports:
+        - name: peer
+          containerPort: 2888
+        - name: leader-election
+          containerPort: 3888
+        - name: {{name}}
+          containerPort: 2181
+        readinessProbe:
+          exec:
+            command:
+            - readiness
+          initialDelaySeconds: 15
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: package
+          mountPath: /zookeeper
+        - name: datadir
+          mountPath: /var/lib/zookeeper
+      - name: {{name}}-sidecar
+        image: {{registry}}/tenx_containers/zksidecar:3.5.3-beta
+        env:
+        - name: SUPER_PASSWORD
+          value: {{password}}
+        - name: ZK_SERVER_HEAP
+          value: 512
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: SERVICE_NAME
+          value: {{name}}
+        - name: ZK_CLIENT_HEAP
+          value: 128
+        volumeMounts:
+        - name: package
+          mountPath: /zookeeper
+        - name: datadir
+          mountPath: /var/lib/zookeeper
+        resources:
+          limits:
+            memory: '512Mi'
+          requests:
+            cpu: 50m
+            memory: '512Mi'
+      volumes:
+      - name: package
+        emptyDir: {}
+  volumeClaimTemplates:
+  - metadata:
+      name: datadir
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: tenx-rbd
+      resources:
+        requests:
+          storage: {{size}}Mi

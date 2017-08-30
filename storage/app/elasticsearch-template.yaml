@@ -1,0 +1,97 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    tenxcloud.com/schemaPortname: {{name}}/TCP
+  name: {{external-name}}
+  labels:
+    app: {{external-name}}
+spec:
+  ports:
+  - port: 9200
+    name: {{name}}
+  selector:
+    app: {{name}}
+  externalIPs:
+    - {{external-ip}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
+  name: {{name}}
+  labels:
+    app: {{name}}
+spec:
+  ports:
+  - port: 9300
+    name: transport
+  clusterIP: None
+  selector:
+    app: {{name}}
+---
+apiVersion: apps/v1beta1
+kind: StatefulSet
+metadata:
+  name: {{name}}
+spec:
+  serviceName: {{name}}
+  replicas: {{replicas}}
+  template:
+    metadata:
+      labels:
+        app: {{name}}
+      annotations:
+        pod.alpha.kubernetes.io/initialized: "true"
+    spec:
+      containers:
+      - name: {{name}}
+        securityContext:
+          privileged: true
+        image: {{registry}}/tenx_containers/es-pet:2.4.5
+        env:
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: SERVICE_NAME
+          value: {{name}}
+        - name: CLUSTER_NAME
+          value: {{name}}
+        - name: REMOTE_EXT_DICT
+          value: http://mi-pc-web:8080/api/v1/keyword/loadGJCK
+        - name: REMOTE_EXT_STOPWORDS
+          value: http://mi-pc-web:8080/api/v1/keyword/loadGJCKStop
+        ports:
+        - name: transport
+          containerPort: 9300
+        - name: {{name}}
+          containerPort: 9200
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - "curl http://127.0.0.1:9200/_cluster/health 2>&1"
+          initialDelaySeconds: 15
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: datadir
+          mountPath: /var/lib/elasticsearch
+        resources:
+          limits:
+            memory: '2048Mi'
+          requests:
+            cpu: 500m
+            memory: '512Mi'
+  volumeClaimTemplates:
+  - metadata:
+      name: datadir
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: tenx-rbd
+      resources:
+        requests:
+          storage: {{size}}Mi

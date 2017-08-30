@@ -1,0 +1,137 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    tenxcloud.com/schemaPortname: redistest/TCP
+    system/lbgroup: none
+  name: redistest-7nlpc
+  labels:
+    app: redistest-7nlpc
+spec:
+  ports:
+    - port: 6379
+      name: redistest
+  selector:
+    app: redistest
+  externalIPs:
+    - 11.11.1.1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
+  name: redistest
+  labels:
+    app: redistest
+spec:
+  ports:
+  - port: 6379
+    name: peer
+  # *.redis.default.svc.cluster.local
+  clusterIP: None
+  selector:
+    app: redistest
+---
+apiVersion: apps/v1beta1
+kind: StatefulSet
+metadata:
+  name: redistest
+spec:
+  serviceName: redistest
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: redistest
+      annotations:
+        pod.alpha.kubernetes.io/initialized: "true"
+        pod.alpha.kubernetes.io/init-containers: '[
+            {
+                "name": "install",
+                "image": "index.tenxcloud.com/google_containers/redis-install-3.2.0",
+                "imagePullPolicy": "Always",
+                "args": ["--install-into=/opt", "--work-dir=/work-dir"],
+                "env": [
+                  {
+                      "name": "REDIS_PASSWORD",
+                      "value": "123123"
+                   }
+                ],
+                "volumeMounts": [
+                    {
+                        "name": "opt",
+                        "mountPath": "/opt"
+                    },
+                    {
+                        "name": "workdir",
+                        "mountPath": "/work-dir"
+                    }
+                ]
+            },
+            {
+                "name": "bootstrap",
+                "image": "192.168.1.52/tenx_containers/debian:jessie",
+                "command": ["/work-dir/peer-finder"],
+                "args": ["-on-start=\"/work-dir/on-start.sh\"", "-service=redistest"],
+                "env": [
+                  {
+                      "name": "POD_NAMESPACE",
+                      "valueFrom": {
+                          "fieldRef": {
+                              "apiVersion": "v1",
+                              "fieldPath": "metadata.namespace"
+                          }
+                      }
+                   }
+                ],
+                "volumeMounts": [
+                    {
+                        "name": "opt",
+                        "mountPath": "/opt"
+                    },
+                    {
+                        "name": "workdir",
+                        "mountPath": "/work-dir"
+                    }
+                ]
+            }
+        ]'
+    spec:
+      containers:
+      - name: redistest
+        image: 192.168.1.52/tenx_containers/debian:jessie
+        ports:
+        - containerPort: 6379
+          name: peer
+        resources:
+          limits:
+            memory: '512Mi'
+          requests:
+            cpu: 250m
+            memory: '512Mi'
+        command:
+        - /opt/redis/redis-server
+        args:
+        - /opt/redis/redis.conf
+        volumeMounts:
+        - name: datadir
+          mountPath: /data
+        - name: opt
+          mountPath: /opt
+      volumes:
+      - name: opt
+        emptyDir: {}
+      - name: workdir
+        emptyDir: {}
+      - name: datadir
+        emptyDir: {}
+  volumeClaimTemplates:
+  - metadata:
+      name: datadir
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: tenx-rbd
+      resources:
+        requests:
+          storage: 512Mi
