@@ -36,8 +36,47 @@
 
 **** rbd 在线扩容
  	  https://my.oschina.net/oscfox/blog/312220
+
+    #+BEGIN_SRC sh
+      # rbd create --size 10000 test
+      # rbd map test
+      # mkfs.ext4 -q /dev/rbd1
+      # mount /dev/rbd1 /mnt
+      # df -h /mnt
+      Filesystem      Size  Used Avail Use% Mounted on
+      /dev/rbd1       9.5G   22M  9.0G   1% /mnt
+      # blockdev --getsize64 /dev/rbd1
+      10485760000
+      # rbd resize --size 20000 test
+      Resizing image: 100% complete...done.
+      # blockdev --getsize64 /dev/rbd1
+      20971520000
+      # resize2fs /dev/rbd1
+      resize2fs 1.42 (29-Nov-2011)
+      Filesystem at /dev/rbd1 is mounted on /mnt; on-line resizing required
+      old_desc_blocks = 1, new_desc_blocks = 2
+      The filesystem on /dev/rbd1 is now 5120000 blocks long.
+      # df -h /mnt
+      Filesystem      Size  Used Avail Use% Mounted on
+      /dev/rbd1        20G   27M   19G   1% /mnt
+    #+END_SRC
+    此方法只对 EXT4 文件系统块设备有效，XFS 文件系统，在 reset 之后执行 xfs_growfs /mnt
 **** ceph backup
 ***** "How to Backup Ceph Block Storage
  	    https://nicksabine.com/post/ceph-backup/
 ***** "10. 查看使用 RBD 镜像的客户端 · Ceph 运维手册"
  	    https://lihaijing.gitbooks.io/ceph-handbook/content/Advance_usage/list_rbd_watcher.html
+*** ceph 配置相关
+**** kubernetes 使用 ceph
+ 	   http://www.cnblogs.com/boshen-hzb/p/6673134.html
+**** ceph 相关基本概念
+*****  麦子迈|解析 Ceph : OSD , OSDMap 和 PG, PGMap
+ 	    http://www.wzxue.com/ceph-osd-and-pg/
+      1. Monitor 作为 Ceph 的 Metada Server 维护了集群的信息，它包括了 6 个 Map，分别
+         是 MONMap，OSDMap，PGMap，LogMap，AuthMap，MDSMap。其中 PGMap 和 OSDMap
+         是最重要的两张 Map，会在本文主要涉及。
+***** "在 ceph 中：pool、PG、OSD 的关系 - 波神 - 博客园"
+ 	     http://www.cnblogs.com/boshen-hzb/p/7169143.html
+*** 常见问题以及解决方法
+**** "删除 Ceph 的 image 报 rbd: error: image still has watchers - 波神 - 博客园"
+ 	   http://www.cnblogs.com/boshen-hzb/p/6756484.html
