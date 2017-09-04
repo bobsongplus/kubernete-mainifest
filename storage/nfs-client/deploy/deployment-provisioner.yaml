@@ -1,7 +1,7 @@
 kind: Deployment
 apiVersion: extensions/v1beta1
 metadata:
-  name: nfs-client-provisioner
+  name: nfs-client-provisioner                       # TODO: nfs 服务名称
   namespace: kube-system
 spec:
   replicas: 1
@@ -10,24 +10,24 @@ spec:
   template:
     metadata:
       labels:
-        app: nfs-client-provisioner
+        app: nfs-client-provisioner                   #TODO:nfs 服务名称
     spec:
       serviceAccount: nfs-provisioner
       containers:
-        - name: nfs-client-provisioner               # nfs服务名称
+        - name: nfs-client-provisioner               #TODO nfs服务名称
           image: 192.168.1.55/tenx_containers/nfs-client-provisioner:latest
           volumeMounts:
             - name: nfs-client-root
               mountPath: /persistentvolumes    # 会在此路径下存放一份挂在数据
           env:
             - name: PROVISIONER_NAME
-              value: fuseim.pri/ifs       # provisioner属性由环境变量 PROVISIONER_NAME 提供
+              value: fuseim.pri/ifs       #TODO: nfs服务名称(只可为英文数字)
             - name: NFS_SERVER
-              value: 192.168.0.227      #NFS servier IP地址
+              value: 192.168.0.227      #TODO: NFS servier IP地址
             - name: NFS_PATH
-              value: /var/nfs          # NFS 挂在路径
+              value: /var/nfs          #TODO NFS Server的挂载路径
       volumes:
         - name: nfs-client-root
           nfs:
-            server: 192.168.0.227      #NFS servier IP地址
-            path: /var/nfs             # NFS 挂在路径
+            server: 192.168.0.227      #TODO NFS servier IP地址
+            path: /var/nfs             #TODO  NFS 挂在路径
