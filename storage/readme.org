@@ -120,15 +120,8 @@
     + pv can update capacity->storage, and automatic update pvc size
 
 ** storageclass
-*** 在 Kubernetes 中使用 Sateful Set 部署 Redis Kubernetes 中文社区
- 	  https://www.kubernetes.org.cn/2516.html
 *** Change the default StorageClass
  	  https://kubernetes.io/docs/tasks/administer-cluster/change-default-storage-class/
-*** TODO in-tree
-*** TODO out-of-tree
-** rbd question
-*** Error creating rbd image: executable file not found in $PATH · Issue #38923 · kubernetes/kubernetes
- 	  https://github.com/kubernetes/kubernetes/issues/38923
 ** statefulset
 *** pvc will not delete when statefulset be deleted
     Deleting and/or scaling a StatefulSet down will not delete the volumes
@@ -701,6 +694,8 @@
 
 ** FAQ
 *** 参考
+**** 在 Kubernetes 中使用 Sateful Set 部署 Redis Kubernetes 中文社区
+ 	  https://www.kubernetes.org.cn/2516.html
 **** "Persistent Volumes - Kubernetes"
        https://kubernetes.io/docs/concepts/storage/persistent-volumes/#class
 **** pv 介绍 http://www.jianshu.com/p/fda9de00ba5f
@@ -717,6 +712,8 @@
        disk.Note that not all Persistent volume types support mount
        options.see:https://kubernetes.io/docs/concepts/storage/persistent-volumes/#mountoptions
 
+**** Error creating rbd image: executable file not found in $PATH · Issue #38923 · kubernetes/kubernetes
+ 	  https://github.com/kubernetes/kubernetes/issues/38923
 **** "AdminSocketConfigObs::init: failed: rbd-clients · Issue #278 · ceph/ceph-ansible"
  	   https://github.com/ceph/ceph-ansible/issues/278
 
@@ -726,9 +723,9 @@
 ****** Add support for resizing PVs · Issue #284 · kubernetes/features
  	     https://github.com/kubernetes/features/issues/284
 ****** Allow Updating StatefulSet's entire PodTemplateSpec · Issue #41015 · kubernetes/kubernetes
- 	     htps://github.com/kubernetes/kubernetes/issues/41015
+ 	     https://github.com/kubernetes/kubernetes/issues/41015
 ****** Support \"fstype\" parameter in dynamically provisioned PVs by codablock · Pull Request #45345 · kubernetes/kubernetes
- 	     htps://github.com/kubernetes/kubernetes/pull/45345/files
+ 	     https://github.com/kubernetes/kubernetes/pull/45345/files
 ****** community/volume-provisioning.md at master · kubernetes/community
  	     https://github.com/kubernetes/community/blob/master/contributors/design-proposals/volume-provisioning.md
 ****** "Do not release resource(image) when using rbd storageclass. · Issue #45067 · kubernetes/kubernetes"
@@ -736,3 +733,8 @@
  	     https://github.com/kubernetes/kubernetes/issues/45067
 ****** "[StatefulSet] Fail to scale pod when there is a blocking pod · Issue #36333 · kubernetes/kubernetes"
  	     https://github.com/kubernetes/kubernetes/issues/36333
+****** secret in storageclass "Find a way to pass a secret to dynamic provisioner · Issue #30897 · kubernetes/kubernetes"
+ 	     https://github.com/kubernetes/kubernetes/issues/30897
+       long story short,Ceph's admin secret is only pulled by provision controller. Ceph user's
+       secret is used for map,
+
