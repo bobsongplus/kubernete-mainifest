@@ -8,7 +8,7 @@ metadata:
   name: prometheus
   namespace: kube-system
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       plugin: prometheus
@@ -17,6 +17,7 @@ spec:
       labels:
         plugin: prometheus
     spec:
+      serviceAccount: prometheus
       containers:
       - image: 192.168.1.52/tenx_containers/prometheus:v1.6.1
         resources:
