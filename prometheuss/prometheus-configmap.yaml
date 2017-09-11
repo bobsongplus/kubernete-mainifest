@@ -3,9 +3,10 @@ kind: ConfigMap
 metadata:
   namespace: kube-system
   name: prometheus-config
-
 data:
   prometheus.yaml: |
+    rule_files:
+    - /etc/prometheus_rules/*.rule
     scrape_configs:
     - job_name: 'kubernetes-apiservers'
       kubernetes_sd_configs:
