@@ -1,0 +1,5 @@
+* 扩展阅读
+
+** 文件系统性能表现
+   1. "btrfs cfq, noop, deadline 三种 IO 调度策略下的 IO 性能表现 - 德哥@Digoal 的日志 - 网易博客"
+ 	  http://blog.163.com/digoal@126/blog/static/1638770402015117214118/
