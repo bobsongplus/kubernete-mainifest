@@ -18,8 +18,8 @@
       pvc 使用。
     + 回收(Reclaiming)。pv 可以设置三种回收策略：保留（Retain），回收（Recycle）
       和删除（Delete）
-      - 保留策略：允许人工处理保留的数据。 - 删除策略：将删除 pv 和外部关联的存储
-       资源，需要插件支持。
+      - 保留策略：允许人工处理保留的数据。
+      - 删除策略：将删除 pv 和外部关联的存储资源，需要插件支持。
       - 回收策略：将执行清除操作，之后可以被新的 pvc 使用，需要插件支持。 目前只
        有 NFS 和 HostPath 类型卷支持回收策略，AWS EBS,GCE PD,Azure Disk 和
        Cinder 支持删除(Delete)策略。claims must exist in the same namespaces as

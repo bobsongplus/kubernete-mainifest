@@ -1,11 +1,16 @@
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
-  name: task-pv-claim
+  name: no-mount-pvc
+  namespace: song1
+  labels:
+    tenxcloud.com/fsType: ext4 
+    tenxcloud.com/storageType: ceph 
+    texncloud.com/srType: private 
+    tenxcloud.com/reclaimPolicy: delete 
 spec:
   accessModes:
     - ReadWriteOnce
-    - ReadOnlyMany
   storageClassName: tenx-rbd
   resources:
     requests:

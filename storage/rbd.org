@@ -66,6 +66,10 @@
  	    https://nicksabine.com/post/ceph-backup/
 ***** "10. 查看使用 RBD 镜像的客户端 · Ceph 运维手册"
  	    https://lihaijing.gitbooks.io/ceph-handbook/content/Advance_usage/list_rbd_watcher.html
+**** rbd format1 VS format2
+     + Format 1: Hammer 以及 Hammer 之前默认都是这种格式，并且 rbd_default_features
+       = 3., 不支持 rbd 的 clone 等功能
+     + Format 2: Jewel 默认是这种格式，并且 rbd_default_features = 61.
 *** ceph 配置相关
 **** kubernetes 使用 ceph
  	   http://www.cnblogs.com/boshen-hzb/p/6673134.html
@@ -80,3 +84,5 @@
 *** 常见问题以及解决方法
 **** "删除 Ceph 的 image 报 rbd: error: image still has watchers - 波神 - 博客园"
  	   http://www.cnblogs.com/boshen-hzb/p/6756484.html
+**** 常用命令
+     fuser -awv dev/rbdx 查看当前设备文件被谁在占用
