@@ -1,0 +1,76 @@
+ALERT CPU_Threshold_Exceeded
+  IF (100 * (1 - avg by(instance)(irate(node_cpu{mode='idle'}[1h])))) > 90
+  FOR 1h
+  LABELS { severity = "critical" }
+  ANNOTATIONS {
+    summary = "Instance {{ $labels.instance }} CPU usage is dangerously high",
+    description = "This device's CPU usage has exceeded the thresold of 90% with a value of {{ $value }} for 1 hour."
+  }
+
+ALERT Instance_Low_Memory
+  IF node_memory_MemAvailable < 268435456
+  FOR 10m
+  LABELS { severity = "critical" }
+  ANNOTATIONS {
+    summary = "Instance {{$labels.instance}}: memory low",
+    description = "{{$labels.instance}} has less than 256M memory available"
+  }
+
+ALERT Disk_USAGE_Thresold_Exceeded
+  IF node_filesystem_free{fstype!~"rootfs|tmpfs|fuse.lxcfs"} / node_filesystem_size{fstype!~"rootfs|tmpfs|fuse.lxcfs"} < 0.10
+  FOR 15m
+  LABELS { severity = "warning" }
+  ANNOTATIONS {
+    summary     = "Instance {{$labels.instance}}: disk {{$labels.instance}} filling up",
+    description = "{{$labels.device}} mounted on {{$labels.mountpoint}} on {{$labels.instance}} is 90% filled."
+  }
+
+ ALERT Disk_Will_Fill_In_2_Hours
+  IF predict_linear(node_filesystem_free{fstype!~"rootfs|tmpfs|fuse.lxcfs", job='aws'}[1h], 1*3600) < 0
+  FOR 20m
+  LABELS { severity = "warning" }
+  ANNOTATIONS {
+    summary     = "Instance {{$labels.instance}}: disk {{$labels.device}} filling up",
+    description = "{{$labels.device}} mounted on {{$labels.mountpoint}} on {{$labels.instance}} will fill up within 2 hours."
+  }
+
+ALERT Site_DOWN
+  IF probe_success < 1
+  FOR 2m
+  LABELS {
+    severity="critical"
+  }
+  ANNOTATIONS {
+    summary = "{{$labels.instance}} is down",
+   description = "site {{$labels.instance}} is down from 2min."
+  }
+ALERT Site_DOWN
+  IF probe_success < 1
+  FOR 4m
+  LABELS {
+    severity="websiteDown"
+  }
+  ANNOTATIONS {
+    summary = "{{$labels.instance}} is down",
+    description = "site {{$labels.instance}} is down/unreachable."
+  }
+
+ALERT Instance_DOWN
+  IF up == 0
+  FOR 5m
+  LABELS { severity = "critical" }
+  ANNOTATIONS {
+    summary = "Instance {{$labels.instance}} is down",
+    description = "{{$labels.instance}} has been down for more than 8 minutes."
+  }
+
+ALERT Blackbox_Exporter_Down
+  IF count(up{job="blackbox_site_monitoring"} == 1) < 1
+  FOR 1m
+  LABELS {
+    severity="warning"
+  }
+  ANNOTATIONS {
+    summary = "blackbox_exporter is not up",
+    description = "blackbox_exporter is not up for 1min."
+  }

@@ -1,0 +1,57 @@
+1. 权限问题，使用 heapster-rbac.yaml 支持 rbac 权限问题
+
+** heapster
+   测试 metrics 地址
+   #+BEGIN_SRC sh
+     # 获取 cluster 支持的 metrics
+     # curl -L http://<heapster-IP>:8082/api/v1/model/metrics
+
+     # 列出 Nodes 支持的 metrics
+     # curl -L http://<heapster-IP>:8082/api/v1/model/nodes/metrics
+
+     # 查看对应 Pod 的 cpu 使用率
+     # curl -L http://<heapster-IP>:8082/api/v1/model/namespaces/<namespace-name>/pods/<pod-name>/metrics/cpu-usage
+   #+END_SRC
+
+
+
+** influxdb
+*** 基本概念
+    (measurement):数据表
+    database:  数据库
+    retention poclicy: 存储策略
+    tag set: 索引
+    time: 同一个 Series 的数据在物理上会按照 time 时间顺序排列存储在一起
+    field 是 InfluxDB 的必要结构，但也需要注意 field 是没有索引的。tag set 也是数
+    据之上的概念, measurement 包含了 tags、fields 和 time，就类似于传统数据库的
+    表,一个 measurement 可以属于不同的 retention policy(存储策略)，存储策略描述
+    了 InfluxDB 怎么去保持数据(DURATION)，需要在集群中存储多少份数据副本，
+    series: 由 retention policy、measurement、tag sets 三部分组成
+
+
+*** retention Policy
+   1. 查询当前数据库 Retention Policy
+    #+BEGIN_SRC sh
+     curl -XPOST 'http://127.0.0.1:8080/api/v1/proxy/namespaces/kube-system/services/monitoring-influxdb:8086/query' --data-urlencode "db=k8s" --data-urlencode "q=show retention policies on k8s"
+    #+END_SRC
+   2. 删除 retention policy
+
+      #+BEGIN_SRC sh
+        DROP RETENTION POLICY {rp_name} ON {database_name}
+      #+END_SRC
+
+   3.修改 RP 语法
+   #+BEGIN_SRC sh
+     ALTER RETENTION POLICY {rp_name} ON {database_name} DURATION {duration} REPLICATION {n} SHARD DURATION {duration} DEFAULT
+   #+END_SRC
+   后面的参数字段都一样，主要差别就在于关键字段：ALTER RETENTION POLICY
+*** continuous queries
+    之前我们介绍了数据保存策略，数据超过保存策略里指定的时间之后，就会被删除。但我们不想完全删除这些数据
+
+*** tag set
+*** measurements
+    1. 查看当前支持的 mesurements
+
+       #+BEGIN_SRC sh
+         curl -XPOST 'http://127.0.0.1:8080/api/v1/proxy/namespaces/kube-system/services/monitoring-influxdb:8086/query' --data-urlencode "db=k8s" --data-urlencode "q=show measurements"
+       #+END_SRC

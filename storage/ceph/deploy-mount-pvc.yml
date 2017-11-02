@@ -1,0 +1,64 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    name: logtest
+    tenxcloud.com/appName: logtest
+    tenxcloud.com/svcName: logtest
+    texncloud.com/volume: task-pv-claim1
+    tenxcloud.com/volumepath:
+  name: logtest
+  namespace: song1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: logtest
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+      labels:
+        name: logtest
+        tenxcloud.com/appName: logtest
+        tenxcloud.com/svcName: logtest
+        texncloud.com/volume: task-pv-claim1
+    spec:
+      containers:
+      - env:
+        - name: HOME
+          value: /
+        - name: PATH
+          value: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+        image: 192.168.1.52/tenx_containers/ubuntu-write-data-to-file:2.2
+        imagePullPolicy: Always
+        name: logtest
+        ports:
+        - containerPort: 80
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 100m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 512Mi
+        terminationMessagePath: /dev/termination-log
+        volumeMounts:
+        - mountPath: /var/log
+          name: task-pv-storage
+      dnsPolicy: ClusterFirst
+      imagePullSecrets:
+      - name: registrysecret
+      restartPolicy: Always
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:                             # 以下模式为支持新版本的volume
+      - name: {task-pv-storage}
+        persistentVolumeClaim:
+          claimName: task-pv-claim
+          readOnly: false        # fase: rw, true: readOnly

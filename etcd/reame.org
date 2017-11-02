@@ -1,0 +1,5 @@
+* v3 基本命令
+** get all key
+   #+BEGIN_SRC sh
+     ETCDCTL_API=3 ./etcdctl get / --prefix --keys-only
+   #+END_SRC

@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: 2017-10-16T13:39:26Z
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+    kubernetes.io/cluster-service: "true"
+    kubernetes.io/name: Heapster
+  name: heapster
+  namespace: kube-system
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 8082
+    nodePort: 30276
+  selector:
+    k8s-app: heapster
+  sessionAffinity: None
+  #type: ClusterIP
+  type: NodePort
+status:
+  loadBalancer: {}

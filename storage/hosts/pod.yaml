@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: host-nginx
+  namespace: song1
+spec:
+  containers:
+  - image: nginx
+    name: test-container
+    volumeMounts:
+    - mountPath: /test-pd
+      name: test-volume
+    - mountPath: /test-pd1
+      name: test-volume1
+  volumes:
+  - name: test-volume
+    hostPath:
+      path: /data
+  - name: test-volume1
+    hostPath:
+      path: /data
