@@ -1,3 +1,4 @@
+* storageclass/pv/pvc
 ** PV & PVC
 *** 介绍
     PersistentVolume（pv）和 PersistentVolumeClaim（pvc）是 k8s 提供的两种 API
@@ -738,3 +739,22 @@
        long story short,Ceph's admin secret is only pulled by provision controller. Ceph user's
        secret is used for map,
 
+* 存储测试须知
+** rbd
+   1. 保证 rbd agent 地址正确，storage-agent 服务正常，storage-agent 可以访问到 rbd 集
+      群
+   2. 确保 rbd 集群配置正确，其中所填写的 ip 和端口，登录到 ceph 集群任意一台设备上，
+      执行 ceph -s， 其中 monmap e3: 3 mons at
+      {ceph-node1=192.168.1.86:6789/0,ceph-node2=192.168.1.87:6789/0,ceph-node3=192.168.1.88:6789/0}
+      表述 ceph 集群的配置
+   3. RBD 认证用户和用户认证秘钥：登录到 ceph 集群的任何设备上，查看文件
+      /etc/ceph/ceph.client.admin.keyring，，当前文件存储已认证的用户，如里面的内容如下：
+      #+BEGIN_SRC js
+        [client.admin]      // admin 为认证用户
+        key = AQD/+PhWLE24KhAAO5KslagvWGl/u2FxhGLoqw==   // RBD 用户认证密钥，填写时，只填写 key 的值
+      #+END_SRC
+
+** nfs
+   1. 根据 wiki：http://wiki.tenxcloud.com/display/Docs/Storage+-+NFS，创建 nfs
+      服务，并配置，保证服务可用
+   2. 添加 nfs 服务地址，并将配置好的服务挂载路径写入配置中

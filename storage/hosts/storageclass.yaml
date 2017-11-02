@@ -6,3 +6,5 @@ metadata:
     tenxcloud.com/storageStatus: open
   name: host-storage
 provisioner: host-storage
+parameters:
+    baseDir: /tenxcloud

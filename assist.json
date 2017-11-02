@@ -38,7 +38,7 @@
                 "containers": [
                     {
                         "name": "assist-agent",
-                        "image": "192.168.1.12/tenx_containers/assist:v1.0.8",
+                        "image": "192.168.1.55/tenx_containers/assist:v1.0.0",
                         "command": [
                             "/assist"
                         ],
@@ -67,7 +67,8 @@
                 "restartPolicy": "Always",
                 "terminationGracePeriodSeconds": 30,
                 "dnsPolicy": "ClusterFirst",
-                "securityContext": {}
+              "securityContext": {},
+              "serviceAccount": "fluentd-es"
             }
         }
     }
