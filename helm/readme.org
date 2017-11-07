@@ -1,0 +1,325 @@
+* helm & charts
+helm 是一个 kubernetes 应用的包管理工具，用于管理 charts（预先配置好的安装包资源），
+有点儿类似于 ubuntu 的 apt 和 centos 的 yum
+安装 helm
+1. 镜像：
+   helm 和 tiller 版本要一致，每个 helm 的版本对应的 k8s 版本不同， 目前 2.5.1
+   针对 k8s 1.5-1.7,高版本的 helm 已经不再兼容 k8s1.6, 安装命令：
+   #+BEGIN_SRC sh
+     helm init -i 192.168.1.55/tenx_containers/helm-tiller:v2.5.0
+   #+END_SRC
+   此时会在 kube-system 下创建一个 tiller-deploy 服务
+
+2. rbac
+   + 创建 serviceaccount
+     官方链接：https://github.com/kubernetes/helm/blob/master/docs/service_accounts.md
+
+     #+BEGIN_SRC yaml
+       apiVersion: v1
+       kind: ServiceAccount
+       metadata:
+         name: tiller
+         namespace: kube-system
+       ---
+       apiVersion: rbac.authorization.k8s.io/v1beta1
+       kind: ClusterRoleBinding
+       metadata:
+         name: tiller
+       roleRef:
+         apiGroup: rbac.authorization.k8s.io
+         kind: ClusterRole
+         name: cluster-admin
+       subjects:
+         - kind: ServiceAccount
+           name: tiller
+           namespace: kube-system
+
+      #+END_SRC
+
+   + 为 tiller-deploy 添加 serviceaccount
+     #+BEGIN_SRC sh
+      kubectl patch deploy --namespace kube-system tiller-deploy -p '{"spec":{"template":{"spec":{"serviceAccount":"tiller"}}}}'
+     #+END_SRC
+
+3. socat 命令需要支持
+   Helm uses the Kubernetes proxy service to connect to the Tiller server. If
+   the command kubectl proxy does not work for you, neither will Helm.
+   Typically, the error is related to a missing socat service
+
+** 创建 chart
+   创建 chart 命令
+
+   #+BEGIN_SRC sh
+     $ helm create  redis
+     $ tree redis
+      redis
+     ├── Chart.yaml #Chart 本身的版本和配置信息
+     ├── charts #依赖的 chart
+     ├── templates #配置模板目录
+     │   ├── NOTES.txt #helm 提示信息
+     │   ├── _helpers.tpl #用于修改 kubernetes objcet 配置的模板
+     │   ├── deployment.yaml #kubernetes Deployment object
+     │   ├── networkpolicy.yaml #kubernetes networkpolicy object
+     │   ├── pvc.yaml #kubernetes persisstenvolumeclaim object
+     │   └── svc.yaml #kubernetes Serivce
+     └── values.yaml #kubernetes object configuration
+     2 directories, 6 files
+   #+END_SRC
+
+*** templates
+    Templates 目录下是 yaml 文件的模板，遵循 Go template 语法
+    deployment.yaml 的配置文件内容：
+    #+BEGIN_SRC yaml
+      apiVersion: extensions/v1beta1
+      kind: Deployment
+      metadata:
+        name: {{ template "redis.fullname" . }}
+        labels:
+          app: {{ template "redis.fullname" . }}
+          chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+          release: "{{ .Release.Name }}"
+          heritage: "{{ .Release.Service }}"
+      spec:
+        template:
+          metadata:
+            labels:
+              app: {{ template "redis.fullname" . }}
+      {{- if .Values.podLabels }}
+      {{ toYaml .Values.podLabels | indent 8 }}
+      {{- end }}
+          spec:
+            securityContext:
+              runAsUser: 1001
+              fsGroup: 1001
+            {{- if .Values.nodeSelector }}
+            nodeSelector:
+      {{ toYaml .Values.nodeSelector | indent 8 }}
+            {{- end }}
+            {{- if .Values.tolerations }}
+            tolerations:
+      {{ toYaml .Values.tolerations | indent 8 }}
+            {{- end }}
+            containers:
+            - name: {{ template "redis.fullname" . }}
+              image: "{{ .Values.image }}"
+              imagePullPolicy: {{ default "" .Values.imagePullPolicy | quote }}
+              {{- if .Values.args }}
+              args:
+      {{ toYaml .Values.args | indent 10 }}
+              {{- end }}
+              env:
+              {{- if .Values.usePassword }}
+              - name: REDIS_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: {{ template "redis.fullname" . }}
+                    key: redis-password
+              {{- else }}
+              - name: ALLOW_EMPTY_PASSWORD
+                value: "yes"
+              {{- end }}
+              ports:
+              - name: redis
+                containerPort: 6379
+              livenessProbe:
+                exec:
+                  command:
+                  - redis-cli
+                  - ping
+                initialDelaySeconds: 30
+                timeoutSeconds: 5
+              readinessProbe:
+                exec:
+                  command:
+                  - redis-cli
+                  - ping
+                initialDelaySeconds: 5
+                timeoutSeconds: 1
+              resources:
+      {{ toYaml .Values.resources | indent 10 }}
+              volumeMounts:
+              - name: redis-data
+                mountPath: /bitnami
+      {{- if .Values.metrics.enabled }}
+            - name: metrics
+              image: "{{ .Values.metrics.image }}:{{ .Values.metrics.imageTag }}"
+              imagePullPolicy: {{ .Values.metrics.imagePullPolicy | quote }}
+              env:
+              - name: REDIS_ALIAS
+                value: {{ template "redis.fullname" . }}
+              {{- if .Values.usePassword }}
+              - name: REDIS_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: {{ template "redis.fullname" . }}
+                    key: redis-password
+              {{- end }}
+              ports:
+              - name: metrics
+                containerPort: 9121
+              resources:
+      {{ toYaml .Values.metrics.resources | indent 10 }}
+      {{- end }}
+            volumes:
+            - name: redis-data
+            {{- if .Values.persistence.enabled }}
+              persistentVolumeClaim:
+                claimName: {{ .Values.persistence.existingClaim | default (include "redis.fullname" .) }}
+            {{- else }}
+              emptyDir: {}
+            {{- end -}}
+    #+END_SRC
+ 这是该应用的 service 的 yaml 配置文件，其中的双大括号包扩起来的部分是 Go template，其
+ 中的 Values 是在 values.yaml 文件中定义的：
+
+ #+BEGIN_SRC yaml
+   image: bitnami/redis:4.0.2-r1
+   ## Specify a imagePullPolicy
+   imagePullPolicy: IfNotPresent
+
+   ## Kubernetes service type
+   serviceType: ClusterIP
+
+   ## Use password authentication
+   usePassword: true
+
+   ## Redis password
+   ## Defaults to a random 10-character alphanumeric string if not set and usePassword is true
+   ## ref: https://github.com/bitnami/bitnami-docker-redis#setting-the-server-password-on-first-run
+   ##
+   # redisPassword:
+
+   ## Redis command arguments
+   ##
+   ## Can be used to specify command line arguments, for example:
+   ##
+   ## args:
+   ##  - "redis-server"
+   ##  - "--maxmemory-policy volatile-ttl"
+   args:
+
+   ## Enable persistence using Persistent Volume Claims
+   ## ref: http://kubernetes.io/docs/user-guide/persistent-volumes/
+   ##
+   persistence:
+     enabled: true
+     # storageClass: "-"
+     accessMode: ReadWriteOnce
+     size: 8Gi
+
+   metrics:
+     enabled: false
+     image: oliver006/redis_exporter
+     imageTag: v0.11
+     imagePullPolicy: IfNotPresent
+     resources: {}
+     annotations:
+       prometheus.io/scrape: "true"
+       prometheus.io/port: "9121"
+
+   ## Configure resource requests and limits
+   ## ref: http://kubernetes.io/docs/user-guide/compute-resources/
+   ##
+   resources:
+     requests:
+       memory: 256Mi
+       cpu: 100m
+
+   ## Node labels and tolerations for pod assignment
+   ## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector
+   ## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#taints-and-tolerations-beta-feature
+   nodeSelector: {}
+   tolerations: []
+
+   ## Additional pod labels
+   ## ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
+   podLabels: {}
+
+   networkPolicy:
+     ## Enable creation of NetworkPolicy resources.
+     ##
+     enabled: false
+
+     ## The Policy model to apply. When set to false, only pods with the correct
+     ## client label will have network access to the port PostgreSQL is listening
+     ## on. When true, Redis will accept connections from any source
+     ## (with the correct destination port).
+     ##
+     allowExternal: true
+
+ #+END_SRC
+ 对应以上两个配置文件，deployment 中的 image:为 "{{ .Values.metrics.image }}:{{
+ .Values.metrics.imageTag }}"，则在执行 helm intall 时，会将 value.yaml 文件中的内容
+ 赋值到 deployment 中，最终的值分别为：oliver006/redis_exporter 和 v0.11
+** 调试
+   检查配置和模板是否生效
+   #+BEGIN_SRC sh
+     helm install --dry-run --debug <chart_dir>命令来验证 chart 配置,该输出中包含了模板的变量配置与最终渲染的 yaml 文件。
+   #+END_SRC
+** 部署
+    helm install <chart-name>
+** 查看部署的 release
+   helm list
+   #+BEGIN_SRC sh
+     [root@harbor-master templates]# helm list
+     NAME      	REVISION	UPDATED                 	STATUS  	CHART      	NAMESPACE
+     wise-hound	1       	Tue Nov  7 10:40:43 2017	DEPLOYED	redis-1.0.2	default
+     zinc-fish 	1       	Fri Nov  3 17:10:25 2017	DEPLOYED	redis-1.0.2	default
+   #+END_SRC
+ x
+** 删除 chart
+    helm delete eating-hound
+** 打包分享
+   我们可以修改 Chart.yaml 中的 helm chart 配置信息，然后使用下列命令将 chart 打包成一
+   个压缩文件。可通过 rsync 或 git 可以将 chart 发不到远程设备上，提供 chart 服务下载
+   功能，helm 自带已经可以实现 http 服务，命令：helm serve
+
+   #+BEGIN_SRC sh
+     helm package .
+   #+END_SRC
+
+** 命令详解
+*** helm init
+**** set in cluster
+    + Install the canary build with the --canary-image flag
+    + Install a particular image (version) with --tiller-image
+    + Install to a particular cluster with --kube-context
+    + Install into a particular namespace with --tiller-namespace
+**** set in host
+     There are two ways to do this. The first is to specify the --host option on
+     the command line. The second is to set the $HELM_HOST environment variable.
+
+*** Upgrading Tiller
+    Tiller can be upgraded using helm init --upgrade.
+
+    #+BEGIN_SRC sh
+      export TILLER_TAG=v2.0.0-beta.1        # Or whatever version you want
+      $ kubectl --namespace=kube-system set image deployments/tiller-deploy tiller=gcr.io/kubernetes-helm/tiller:$TILLER_TAG
+      deployment "tiller-deploy" image updated
+    #+END_SRC
+    Setting TILLER_TAG=canary will get the latest snapshot of master.
+*** Deleting or Reinstalling Tiller
+
+    #+BEGIN_SRC sh
+      $kubeclt delete deployment tiller-deploy -n kube-system
+      or
+      $helm reset
+    #+END_SRC
+*** advanced usage
+    + --node-selectors flag allows us to specify the node labels required for
+      scheduling the Tiller pod.
+    + -override allows you to specify properties of Tiller's deployment manifest.
+    + --output flag allows us skip the installation of Tiller's deployment manifest and simply output the deployment manifest to stdout in either JSON or YAML format
+*** storage backend
+    By default, tiller stores release information in ConfigMaps in the namespace
+    where it is running. As of Helm 2.7.0, there is now a beta storage backend
+    that uses Secrets for storing release information.
+*** tag/condition
+      * The `tags:` key in values must be a top level key. Globals and nested `tags:` tables
+
+
+** 参考阅读
+*** "helm/install.md at master · kubernetes/helm"
+ 	 https://github.com/kubernetes/helm/blob/master/docs/install.md
+*** helm 管理 k8s 应用
+    https://jimmysong.io/kubernetes-handbook/practice/helm.html
