@@ -5,7 +5,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: nfs-provisioner
-    namespace: default
+    namespace: kube-system
 roleRef:
   kind: ClusterRole
   name: nfs-provisioner-runner
