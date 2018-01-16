@@ -1,0 +1,1 @@
+docker_proxy.sh 设置docker代理，这时可以将shadowsocks socks5 ip改为0.0.0.0然后修改docker_proxy.sh中的proxy，重启docker，此时下载gci.io中的容器就方便多了
