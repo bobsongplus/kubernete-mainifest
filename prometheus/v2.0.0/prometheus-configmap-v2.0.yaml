@@ -1,4 +1,3 @@
----
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -14,7 +13,7 @@ data:
       - role: endpoints
       scheme: https
       tls_config:
-        insecure_skip_verify: true
+        ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
       bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
       relabel_configs:
       - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
@@ -25,13 +24,36 @@ data:
       scheme: https
       tls_config:
         ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-        insecure_skip_verify: true
       bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
       kubernetes_sd_configs:
       - role: node
       relabel_configs:
       - action: labelmap
         regex: __meta_kubernetes_node_label_(.+)
+      - target_label: __address__
+        replacement: kubernetes.default.svc:443
+      - source_labels: [__meta_kubernetes_node_name]
+        regex: (.+)
+        target_label: __metrics_path__
+        replacement: /api/v1/nodes/${1}/proxy/metrics
+
+    - job_name: 'kubernetes-cadvisor'
+      scheme: https
+      tls_config:
+        ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+      bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+
+      kubernetes_sd_configs:
+      - role: node
+      relabel_configs:
+      - action: labelmap
+        regex: __meta_kubernetes_node_label_(.+)
+      - target_label: __address__
+        replacement: kubernetes.default.svc:443
+      - source_labels: [__meta_kubernetes_node_name]
+        regex: (.+)
+        target_label: __metrics_path__
+        replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
     - job_name: 'kubernetes-service-endpoints'
       kubernetes_sd_configs:
       - role: endpoints
@@ -73,7 +95,7 @@ data:
       - source_labels: [__address__]
         target_label: __param_target
       - target_label: __address__
-        replacement: blackbox
+        replacement: blackbox-exporter.example.com:9115
       - source_labels: [__param_target]
         target_label: instance
       - action: labelmap
@@ -106,16 +128,7 @@ data:
       - source_labels: [__meta_kubernetes_pod_name]
         action: replace
         target_label: kubernetes_pod_name
----
-apiVersion: v1
-data:
-  admin.rule: "ALERT container_cpu_usage_seconds_total_gt_8000_a7a217fe9944229238d85e556c78738b\n\tIF
-    (ceil(sum(rate(container_cpu_usage_seconds_total{namespace=\"admin\",pod_name=~\"^test11-[0-9]{5,15}-[0-9a-zA-Z]{5}$\"}[5m]))
-    * 100 * 100) / 100) > 80\n\tLABELS {tenxClusterID=\"CID-fe23111d77cb\", tenxNamespace=\"admin\",
-    tenxStrategyID=\"STRAID-2UHEKGDWxmFv\", tenxStrategyName=\"fixissue1\", tenxTargetName=\"test11\",
-    tenxTargetType=\"service\"}\n\tANNOTATIONS {condition=\"CPU利用率 > 80%\", createTime=\"2017-06-01T03:02:16Z\",
-    currentValue=\"CPU利用率 {{ $value }}%\", tenxMetricType=\"cpu/usage_rate\", tokenMD5=\"326aa6cdbb359a3dbca0e05d2d21d532\"}\n"
-kind: ConfigMap
-metadata:
-  name: prometheus-rules
-  namespace: kube-system
+      # put instance name set to node name
+      - source_labels: [__meta_kubernetes_pod_node_name]
+        action: replace
+        target_label: instance
