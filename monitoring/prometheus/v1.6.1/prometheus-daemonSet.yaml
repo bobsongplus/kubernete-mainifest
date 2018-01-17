@@ -16,6 +16,7 @@ spec:
       labels:
         plugin: prometheus
     spec:
+      serviceAccount: prometheus
       containers:
       - image: 192.168.1.52/tenx_containers/prometheus:v1.6.1
         resources:

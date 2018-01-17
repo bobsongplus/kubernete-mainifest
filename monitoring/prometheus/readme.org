@@ -1,0 +1,4 @@
+* prometheus config
+
+** kube-state-metrics
+   对集群中各个对象的监控指标
