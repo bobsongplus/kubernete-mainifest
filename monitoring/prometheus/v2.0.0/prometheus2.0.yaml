@@ -52,8 +52,6 @@ spec:
         volumeMounts:
         - mountPath: /etc/prometheus_rules
           name: rules-volume
-        - mountPath: /prometheus
-          name: data
         - mountPath: /etc/prometheus
           name: config-volume
         - mountPath: /prometheus/data
@@ -91,8 +89,6 @@ spec:
       serviceAccountName: prometheus
       terminationGracePeriodSeconds: 30
       volumes:
-      - emptyDir: {}
-        name: data
       - configMap:
           defaultMode: 420
           name: prometheus-rules

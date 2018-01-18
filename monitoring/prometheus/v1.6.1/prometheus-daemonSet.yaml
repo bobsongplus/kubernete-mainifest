@@ -31,17 +31,15 @@ spec:
         - "/bin/prometheus"
         args:
         - "-config.file=/etc/prometheus/prometheus.yaml"
-        - "-storage.local.path=/prometheus"
+        - "-storage.local.path=/prometheus/data"
         - "-storage.local.retention=24h"
         - "-alertmanager.url=http://alertmanager:9093"
         ports:
         - containerPort: 9090
           protocol: TCP
         volumeMounts:
-        - name: rules-volume
-          mountPath: "/etc/prometheus_rules"
-        - mountPath: "/prometheus"
-          name: data
+        - mountPath: /prometheus/data
+          name: data-volume
         - mountPath: "/etc/prometheus"
           name: config-volume
         - name: tenxcloud-time-localtime
@@ -81,3 +79,6 @@ spec:
       - name: tenxcloud-time-zone
         hostPath:
           path: "/etc/timezone"
+      - hostPath:
+          path: /tenxcloud/prometheus_data
+        name: data-volume
