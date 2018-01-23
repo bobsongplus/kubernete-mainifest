@@ -20,12 +20,12 @@ spec:
       containers:
       - image: 192.168.1.52/tenx_containers/prometheus:v1.6.1
         resources:
-          requests:
-            cpu: 200m
-            memory: 300Mi
           limits:
-            cpu: 200m
-            memory: 300Mi
+            cpu: "2"
+            memory: 2000Mi
+          requests:
+            cpu: 500m
+            memory: 1000Mi
         name: prometheus
         command:
         - "/bin/prometheus"

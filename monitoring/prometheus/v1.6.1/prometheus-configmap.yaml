@@ -5,6 +5,8 @@ metadata:
   name: prometheus-config
 data:
   prometheus.yaml: |
+    global:
+      scrape_interval: 30s
     rule_files:
     - /etc/prometheus_rules/*.rule
     scrape_configs:
