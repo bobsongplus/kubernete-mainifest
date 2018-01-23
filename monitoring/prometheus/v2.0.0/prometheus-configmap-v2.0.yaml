@@ -5,6 +5,9 @@ metadata:
   name: prometheus-config
 data:
   prometheus.yaml: |
+    global:
+      evaluation_interval: 30s
+      scrape_interval: 30s
     rule_files:
     - /etc/prometheus_rules/*.rule
     scrape_configs:
@@ -55,6 +58,7 @@ data:
         target_label: __metrics_path__
         replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
     - job_name: 'kubernetes-service-endpoints'
+      honor_labels: false
       kubernetes_sd_configs:
       - role: endpoints
       relabel_configs:
@@ -76,12 +80,28 @@ data:
         replacement: $1:$2
       - action: labelmap
         regex: __meta_kubernetes_service_label_(.+)
-      - source_labels: [__meta_kubernetes_namespace]
-        action: replace
-        target_label: kubernetes_namespace
       - source_labels: [__meta_kubernetes_service_name]
         action: replace
         target_label: kubernetes_name
+      - action: keep
+        source_labels:
+        - __meta_kubernetes_endpoint_port_name
+      - source_labels:
+        - __meta_kubernetes_namespace
+        action: replace
+        target_label: namespace
+      - source_labels:
+        - __meta_kubernetes_pod_name
+        action: replace
+        target_label: pod
+      - source_labels:
+        - __meta_kubernetes_service_name
+        target_label: service
+      - source_labels:
+        - __meta_kubernetes_service_name
+        target_label: job
+        replacement: ${1}
+
     - job_name: 'kubernetes-services'
       metrics_path: /probe
       params:
