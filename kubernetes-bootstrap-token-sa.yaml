@@ -25,3 +25,4 @@ subjects:
   name: system:bootstrap:d07b9d
   #TODO tokens authenticate as the username system:bootstrap:<token id> and are members of the group
   # TODO: modify cluster apitoken in db.tenx_clusters
+# doc: https://kubernetes.io/docs/admin/bootstrap-tokens/#enabling-bootstrap-token-authentication
