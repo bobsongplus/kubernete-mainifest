@@ -34,7 +34,7 @@ spec:
         - --storage.tsdb.retention=24h
         command:
         - /bin/prometheus
-        image: 192.168.1.52/tenx_containers/prometheus:v2.0.0
+        image: 192.168.1.52/tenx_containers/prometheus:v2.1.0
         imagePullPolicy: IfNotPresent
         name: prometheus
         ports:
