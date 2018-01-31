@@ -1,0 +1,64 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    name: nfs-storage-deploy
+    tenxcloud.com/appName: nfs-storage-deploy
+    tenxcloud.com/svcName: nfs-storage-deploy
+    texncloud.com/volume: nfs-pvc
+    tenxcloud.com/volumepath:
+  name: nfs-storage-deploy
+  namespace: song1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: nfs-storage-deploy
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+      labels:
+        name: nfs-storage-deploy
+        tenxcloud.com/appName: nfs-storage-deploy
+        tenxcloud.com/svcName: nfs-storage-deploy
+        texncloud.com/volume: nfs-pvc
+    spec:
+      containers:
+      - env:
+        - name: HOME
+          value: /
+        - name: PATH
+          value: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+        image: 192.168.1.52/tenx_containers/ubuntu-write-data-to-file:2.2
+        imagePullPolicy: Always
+        name: nfs-storage-deploy
+        ports:
+        - containerPort: 80
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 100m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 512Mi
+        terminationMessagePath: /dev/termination-log
+        volumeMounts:
+        - mountPath: /var/log
+          name: task-pv-storage
+      dnsPolicy: ClusterFirst
+      imagePullSecrets:
+      - name: registrysecret
+      restartPolicy: Always
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: task-pv-storage
+        persistentVolumeClaim:
+          claimName: nfs-pvc
+          readOnly: false        # fase: rw, true: readOnly

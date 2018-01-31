@@ -1,8 +1,6 @@
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  annotations:
-    deployment.kubernetes.io/revision: "4"
   labels:
     app: prometheus
     name: prometheus-deployment
@@ -32,6 +30,7 @@ spec:
         - --query.timeout=10s
         - --storage.tsdb.path=/prometheus/data
         - --storage.tsdb.retention=24h
+        - --web.enable-lifecycle
         command:
         - /bin/prometheus
         image: 192.168.1.52/tenx_containers/prometheus:v2.1.0
@@ -99,10 +98,13 @@ spec:
         name: config-volume
       - hostPath:
           path: /etc/localtime
+          type: ""
         name: tenxcloud-time-localtime
       - hostPath:
           path: /tenxcloud/prometheus_data
+          type: ""
         name: data-volume
       - hostPath:
           path: /etc/timezone
+          type: ""
         name: tenxcloud-time-zone
