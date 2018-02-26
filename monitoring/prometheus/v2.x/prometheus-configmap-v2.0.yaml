@@ -129,6 +129,7 @@ data:
         target_label: kubernetes_namespace
       - source_labels: [__meta_kubernetes_service_name]
         target_label: kubernetes_name
+
     - job_name: 'kubernetes-pods'
       kubernetes_sd_configs:
       - role: pod
