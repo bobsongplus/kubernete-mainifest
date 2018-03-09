@@ -1,0 +1,21 @@
+kind: HorizontalPodAutoscaler
+apiVersion: autoscaling/v2beta1
+metadata:
+  name: hello-world-app-hpa
+  namespace: admin
+spec:
+  scaleTargetRef:
+    kind: Deployment
+    name: hello
+    apiVersion: apps/v1
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Object
+    object:
+      target:
+        kind: upstream
+        name: admin-hello-80
+      metricName: nginx_upstream_requests
+      targetValue: 2
+
