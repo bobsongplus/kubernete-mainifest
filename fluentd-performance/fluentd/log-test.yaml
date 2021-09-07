@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: log-test
+  namespace: system-log
+spec:
+  selector:
+    matchLabels:
+      app: log-test
+  replicas: 10
+  template:
+    metadata:
+      labels:
+        app: log-test
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: node31
+      tolerations:
+      - key: "testing"
+        operator: "Equal"
+        value: "log"
+        effect: "NoSchedule"
+      containers:
+      - name: log-generator
+        image: 192.168.1.52/system_containers/logtest:v4

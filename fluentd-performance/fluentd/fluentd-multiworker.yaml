@@ -1,0 +1,269 @@
+apiVersion: v1
+data:
+  monitoring.conf: |-
+    # Prometheus Exporter Plugin
+    # input plugin that exports metrics
+    <source>
+      @id prometheus
+      @type prometheus
+    </source>
+
+    <source>
+      @id monitor_agent
+      @type monitor_agent
+    </source>
+
+    # input plugin that collects metrics from MonitorAgent
+    <source>
+      @id prometheus_monitor
+      @type prometheus_monitor
+      <labels>
+        host ${hostname}
+      </labels>
+    </source>
+
+    # input plugin that collects metrics for output plugin
+    <source>
+      @id prometheus_output_monitor
+      @type prometheus_output_monitor
+      <labels>
+        host ${hostname}
+      </labels>
+    </source>
+
+    # input plugin that collects metrics for in_tail plugin
+    <source>
+      @id prometheus_tail_monitor
+      @type prometheus_tail_monitor
+      <labels>
+        host ${hostname}
+      </labels>
+    </source>
+
+  fluent.conf: |2
+        <system>
+          workers 4
+        </system>
+        
+        <worker 0>
+        <source>
+          @type tail
+          @log_level debug
+          @id in_tail_container_logs
+          path /var/log/containers/*.log
+          pos_file /var/log/fluentd-containers.log.pos
+          tag kubernetes.*
+          read_from_head true
+          <parse>
+            @type json
+            time_format %Y-%m-%dT%H:%M:%S.%NZ
+          </parse>
+        </source>
+        </worker>
+
+        # used for collecting logs from file in container
+        <worker 1>
+        <source>
+          @type tail
+          @log_level debug
+          format none
+          path /var/log/containers/applogs/*
+          pos_file /var/log/fluentd-containers-file.log.pos
+          tag reform.*
+          read_from_head true
+        </source>
+        </worker>
+
+        ## Used for health check
+        <source>
+          @type http
+          port 9880
+          bind 0.0.0.0
+        </source>
+
+        <filter kubernetes.**>
+          @log_level debug
+          @type kubernetes_metadata
+          @id filter_kube_metadata
+        </filter>
+
+        ##http://jira.tenxcloud.com/browse/KAN-6198
+        <filter kubernetes.**>
+          @type record_modifier
+          <replace>
+            key log
+            expression /\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]/
+            replace
+          </replace>
+        </filter>
+
+        ## used with http://gitlab.tenxcloud.com/enterprise-2.0/assist
+        ## used for collecting log from user specified directory
+        <match reform.**>
+          @type record_reformer
+          renew_record false
+          enable_ruby true
+          tag kubernetes.${tag_parts[1]}.${tag_parts[2]}.${tag_parts[3]}.${tag_parts[6]}.log
+          <record>
+            logvolume ${tag_parts[5]}
+            filename ${tag_suffix[8]}
+            log ${message}
+            stream file
+          </record>
+          remove_keys message
+        </match>
+
+        <match kubernetes.**>
+          @type record_reformer
+          time_nano ${t = Time.now; ((t.to_i * 1000000000) + t.nsec).to_s}
+          tag ${tag_suffix[1]}
+        </match>
+
+        ## sink all log to elasticsearch directly
+        <match **>
+          @type elasticsearch
+          @log_level debug
+          include_tag_key true
+          host elasticsearch-logging
+          port 9200
+          user "#{ENV['ES_USERNAME']}"
+          password "#{ENV['ES_PASSWORD']}"
+          scheme "#{ENV['ES_SCHEME']}"
+          ca_file /etc/fluent/certs/ca.crt
+          logstash_prefix ${$.kubernetes.namespace_name}-logstash
+          logstash_format true
+          # Set the chunk limit the same as for fluentd-gcp.
+          reload_on_failure   true
+          reconnect_on_error  true
+          request_timeout 120s
+          <buffer $.kubernetes.namespace_name>
+            @type file
+            path /var/log/td-agent/buffer/elasticsearch
+            chunk_limit_size 15MB
+            total_limit_size 20GB
+            flush_interval 3s
+            flush_mode interval
+            # Never wait longer than 5 minutes between retries.
+            retry_timeout 300
+            retry_forever true
+          </buffer>
+          # custom index template
+          # template_overwrite true
+          template_name tenx_template
+          template_file /etc/fluent/config.d/template.json
+        </match>
+  template.json: |-
+    {
+      "template": "*-logstash-*",
+      "settings": {
+        "refresh_interval": "10s",
+        "number_of_shards": 7,
+        "translog.sync_interval": "60s",
+        "translog.durability": "async",
+        "translog.flush_threshold_size": "2g"
+      },
+      "mappings": {
+        "fluentd": {
+          "dynamic": false,
+          "properties": {
+            "@timestamp": {
+              "type": "date"
+            },
+            "docker": {
+              "properties": {
+                "container_id": {
+                  "type": "keyword"
+                }
+              }
+            },
+            "kubernetes": {
+              "properties": {
+                "container_name": {
+                  "type": "text",
+                  "fields":{
+                    "keyword":{
+                      "type":"keyword",
+                      "ignore_above":256
+                    }
+                  }
+                },
+                "labels": {
+                  "properties": {
+                    "name": {
+                      "type": "text",
+                      "fields":{
+                        "keyword":{
+                          "type":"keyword",
+                          "ignore_above":256
+                        }
+                      }
+                    },
+                    "system/daas-cluster": {
+                      "type": "text",
+                      "fields":{
+                        "keyword":{
+                          "type":"keyword",
+                          "ignore_above":256
+                        }
+                      }
+                    },
+                    "system/daas-type": {
+                      "type": "text",
+                      "fields":{
+                        "keyword":{
+                          "type":"keyword",
+                          "ignore_above":256
+                        }
+                      }
+                    }
+                  }
+                },
+                "namespace_name": {
+                  "type": "text",
+                  "fields":{
+                     "keyword":{
+                      "type":"keyword",
+                      "ignore_above":256
+                    }
+                  }
+                },
+                "pod_name": {
+                  "type": "text",
+                  "fields":{
+                    "keyword":{
+                      "type":"keyword",
+                      "ignore_above":256
+                    }
+                  }
+                }
+              }
+            },
+            "log": {
+              "type": "text",
+              "fields": {
+                "keyword": {
+                  "type":"keyword",
+                  "ignore_above":10000
+                }
+              }
+            },
+            "stream": {
+              "type": "keyword"
+            },
+            "filename": {
+              "type": "keyword"
+            },
+            "time_nano": {
+              "type": "keyword"
+            }
+          }
+        }
+      }
+    }
+kind: ConfigMap
+metadata:
+  labels:
+    component: fluentd
+    k8s-app: fluentd
+  name: fluentd
+  namespace: kube-system
